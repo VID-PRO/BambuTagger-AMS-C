@@ -1,5 +1,5 @@
 # ============================================================
-#  BambuTagger-AMS — Automatic Build & Release
+#  BambuTagger-AMS-C — Automatic Build & Release
 #  Compiles the ESP32 sketch and publishes a GitHub Release
 #  every time a version tag (v*) is pushed.
 #  A normal push to main only compiles (smoke-test, no release).
@@ -72,7 +72,7 @@ jobs:
           APP="${{ github.workspace }}/build/BambuTagger-AMS-C.ino.bin"
           BOOT="${{ github.workspace }}/build/BambuTagger-AMS-C.ino.bootloader.bin"
           PART="${{ github.workspace }}/build/BambuTagger-AMS-C.ino.partitions.bin"
-          MERGED="${{ github.workspace }}/build/BambuTagger-AMS_merged.bin"
+          MERGED="${{ github.workspace }}/build/BambuTagger-AMS-C_merged.bin"
 
           esptool.py \
             --chip esp32 \
@@ -92,32 +92,32 @@ jobs:
       - name: Upload firmware artefacts
         uses: actions/upload-artifact@v4
         with:
-          name: BambuTagger-AMS-firmware-${{ github.sha }}
+          name: BambuTagger-AMS-C-firmware-${{ github.sha }}
           retention-days: 30
           path: |
             build/BambuTagger-AMS-C.ino.bin
             build/BambuTagger-AMS-C.ino.bootloader.bin
             build/BambuTagger-AMS-C.ino.partitions.bin
-            build/BambuTagger-AMS_merged.bin
+            build/BambuTagger-AMS-C_merged.bin
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          name: "BambuTagger-AMS ${{ github.ref_name }}"
+          name: "BambuTagger-AMS-C ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
             build/BambuTagger-AMS-C.ino.bin
             build/BambuTagger-AMS-C.ino.bootloader.bin
             build/BambuTagger-AMS-C.ino.partitions.bin
-            build/BambuTagger-AMS_merged.bin
+            build/BambuTagger-AMS-C_merged.bin
           body: |
             ## Flashing instructions
 
             ### Easiest — merged binary (single file, address 0x00)
             ```
             esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
-              write_flash 0x0 BambuTagger-AMS_merged.bin
+              write_flash 0x0 BambuTagger-AMS-C_merged.bin
             ```
 
             ### Manual — separate files
