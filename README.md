@@ -1,4 +1,4 @@
-# <img alt="logo" src="Logo/bambutagger.png" height="36" />  BambuTagger-AMS-C
+# <img alt="logo" src="Logo/bambutagger.png" height="36" /> BambuTagger-AMS-C
 
 Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament spool tags via RC522, displays live printer AMS tray data over MQTT, and sends RFID tag data to the printer/BMCU. Fully configurable via web interface with automatic AP fallback and OTA firmware updates.
 
@@ -10,89 +10,112 @@ Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament sp
 <img src="Pics/pcb-c.png" />
 </p>
 
+---
+
 ## Features
 
-- **4x RC522** on shared SPI bus polling MIFARE Classic 1K + NTAG tags via `MFRC522-spi-i2c-uart-async`
-- **Multi-tag auto-detect** — MIFARE Classic 1K (Bambu Lab) or NTAG (SpoolEase), auto-routed to correct parser
-- **Nested NDEF recursion** — auto-parses NDEF-in-NDEF payloads (OpenTag3D format)
-- **TigerTag binary parser** — native TigerTag v2.1 protocol support (ID TigerTag magic detection, material, color, weight, temps)
-- **OpenTag3D binary parser** — MIME record type "application/opentag3d", fixed-offset binary format
-- **OpenSpool JSON parser** — NDEF text records with JSON payload, `protocol` key auto-detect
-- **HKDF-SHA256 key derivation** — derives per-sector MIFARE keys from the tag UID using Bambu's KDF salt
-- **Live printer AMS sync** — reads tray data (material, color, type) from the printer over MQTT
-- **Bambu BMCU support** — sends `ams_filament_setting` with correct `tray_type`, `tray_color`, `nozzle_temp_min/max`
-- **Web interface** — 3-tab SPA: Status (merged slots + Sub type + color swatches), Printer Config, WiFi Config
-- **TFT display** — boot splash, live AMS tray data, OTA progress bar, BME280 temp/humidity, MQTT+PTR status
-- **4x WS2812 LEDs** — per-slot color from printer AMS tray data (live MQTT sync)
-- **Boot splash**: 2-second logo display from `Logo/splash.png`
-- **MQTT bridge** — subscribes to printer status, publishes `ams_filament_setting` commands
-- **Auto AP fallback** — captive portal on `192.168.4.1` when WiFi is unavailable
-- **OTA updates** — one-click firmware update from GitHub Releases, TFT progress bar, web overlay with status
-- **GitHub Actions** — CI build on commit, merged binary + OTA binary release on version tags
+| Category | Details |
+|----------|---------|
+| **RFID** | 4x RC522 on shared SPI bus; MIFARE Classic 1K (Bambu Lab) + NTAG (SpoolEase/TigerTag/OpenTag3D/OpenSpool) auto-detection |
+| **Key derivation** | HKDF-SHA256 with Bambu Lab salt — no hardcoded keys |
+| **Tag parsers** | TigerTag v2.1 binary, OpenTag3D MIME binary, OpenSpool JSON, SpoolEase NDEF URI, nested NDEF recursion |
+| **Live AMS sync** | Reads tray data (material, color, type) from printer over MQTT |
+| **BMCU support** | Sends `ams_filament_setting` with correct `tray_type`, `tray_color`, `nozzle_temp_min/max` |
+| **TFT display** | 240×240 1.3" ST7789VW with boot splash, live AMS tray data, OTA progress, BME280 temp/humidity |
+| **LEDs** | 4x WS2812 addressable LEDs with per-slot color from printer AMS tray data |
+| **Web UI** | 3-tab SPA: Status (merged slots + color swatches), Printer Config, WiFi Config |
+| **MQTT bridge** | Subscribes to printer status, publishes `ams_filament_setting` commands |
+| **WiFi** | Auto-STA on boot; AP fallback `192.168.4.1` with captive portal |
+| **OTA updates** | One-click firmware update from GitHub Releases with TFT progress bar |
+| **CI/CD** | GitHub Actions: build on commit, release on version tags |
+
+---
 
 ## Hardware
 
-- **ESP32** Dev Module
-- **4x RC522** RFID/NFC readers (SPI, shared bus)
-- **4x WS2812** addressable LEDs (daisy-chained, single data pin)
-- **240x240 1.3" TFT** ST7789VW SPI display
-- **BME280** temperature/humidity sensor (I2C)
+### Bill of Materials
 
-### Wiring
+| Component | Notes |
+|-----------|-------|
+| **ESP32** Dev Module | Base board |
+| **4x RC522** RFID/NFC readers | SPI interface, shared bus |
+| **4x WS2812** addressable LEDs | Daisy-chained, single data pin |
+| **240×240 1.3" TFT** | ST7789VW SPI display |
+| **BME280** sensor | Temperature/humidity, I2C |
 
-| Component       | ESP32 Pin |
-|-----------------|-----------|
-| **SPI MOSI**    | GPIO 23 |
-| **SPI MISO**    | GPIO 19 |
-| **SPI SCK**     | GPIO 18 |
-| RC522 #1 SS     | GPIO 13 |
-| RC522 #2 SS     | GPIO 12 |
-| RC522 #3 SS     | GPIO 14 |
-| RC522 #4 SS     | GPIO 27 |
-| RC522 #1 RST    | GPIO 26 |
-| RC522 #2 RST    | GPIO 25 |
-| RC522 #3 RST    | GPIO 33 |
-| RC522 #4 RST    | GPIO 32 |
-| **WS2812 data** | GPIO 15 |
-| **TFT SDA**     | GPIO 21 |
-| **TFT SCL**     | GPIO 22 |
-| **TFT DC**      | GPIO 4  |
-| **TFT RES**     | GPIO 5  |
-| **TFT BLK**     | GPIO 2  |
+### Pin Assignments
 
-All RC522 share the same SPI bus (MOSI, MISO, SCK). Each has its own SS and RST pin.
+**SPI Bus (shared by all RC522 readers)**
 
-### Slot Mapping
+| Signal | GPIO |
+|--------|------|
+| MOSI | 23 |
+| MISO | 19 |
+| SCK | 18 |
 
-| RC522 # | SS Pin | Slot | WS2812 Pixel |
-|---------|--------|------|--------------|
-| 1 | 13 | 1 | 0 |
-| 2 | 12 | 2 | 1 |
-| 3 | 14 | 3 | 2 |
-| 4 | 27 | 4 | 3 |
+**RC522 Readers**
 
-## Software Setup (Arduino IDE)
+| Reader | SS Pin | RST Pin | Slot | WS2812 Pixel |
+|--------|--------|---------|------|--------------|
+| #1 | 13 | 26 | 1 | 0 |
+| #2 | 12 | 25 | 2 | 1 |
+| #3 | 14 | 33 | 3 | 2 |
+| #4 | 27 | 32 | 4 | 3 |
 
-1. Install **ESP32 board package**:  
+**TFT Display (ST7789VW SPI)**
+
+| Signal | GPIO |
+|--------|------|
+| SDA (MOSI) | 21 |
+| SCL (SCK) | 22 |
+| DC | 4 |
+| RES | 5 |
+| BLK (Backlight) | 2 |
+
+**WS2812 LEDs**
+
+| Signal | GPIO |
+|--------|------|
+| Data | 15 |
+
+---
+
+## Software
+
+### Required Libraries (Arduino Library Manager)
+
+| Library | Version | Notes |
+|---------|---------|-------|
+| `MFRC522-spi-i2c-uart-async` | latest | Multi-reader SPI sharing (not standard MFRC522) |
+| `Adafruit NeoPixel` | ≥ 1.12 | WS2812 LED control |
+| `Adafruit GFX Library` | ≥ 1.11 | Graphics primitives |
+| `Adafruit ST7735 and ST7789 Library` | ≥ 1.10 | TFT display driver |
+| `PubSubClient` | ≥ 2.8 | MQTT client |
+| `ArduinoJson` | ≥ 6.x or 7.x | JSON parsing |
+| `Adafruit BME280 Library` | latest | Temperature/humidity sensor |
+| `mbedTLS` | Built-in | HKDF-SHA256 key derivation |
+
+### Board Settings (Arduino IDE)
+
+| Setting | Value |
+|---------|-------|
+| Board | **ESP32 Dev Module** |
+| Flash Size | **4 MB** |
+| Partition Scheme | **Default 4MB with spiffs** |
+| Upload Speed | 921600 |
+| Monitor Speed | **115200** |
+
+### Building
+
+1. Install **ESP32 board package** (≥ 3.x):  
    File → Preferences → Additional Board Manager URLs:  
-   `https://espressif.github.io/arduino-esp32/package_esp32_index.json`  
-   Then Tools → Board → Boards Manager → search "ESP32" → install.
+   `https://espressif.github.io/arduino-esp32/package_esp32_index.json`
+2. Install libraries listed above via **Tools → Manage Libraries**.
+3. Open `BambuTagger-AMS-C.ino`, select **ESP32 Dev Module**, and upload.
 
-2. Install required libraries via **Tools → Manage Libraries**:
-   - **MFRC522-spi-i2c-uart-async** — multi-reader SPI sharing (not standard MFRC522)
-   - **Adafruit NeoPixel** by Adafruit (v1.12+)
-   - **Adafruit GFX Library** by Adafruit (v1.11+)
-    - **Adafruit ST7735 and ST7789 Library** by Adafruit (v1.10+)
-   - **PubSubClient** by Nick O'Leary (v2.8+)
-   - **ArduinoJson** by Benoit Blanchon (v6.x or v7.x)
-    - **Adafruit BME280 Library** by Adafruit
-    - **mbedTLS** — bundled with ESP32 core, used for HKDF-SHA256
-
-3. Open `BambuTagger-AMS-C.ino`, select **ESP32 Dev Module** as board, and upload.
+---
 
 ## WiFi & AP Mode
-
-On first boot (or if saved WiFi credentials are invalid), the device automatically opens an access point:
 
 | Scenario | Behavior |
 |----------|----------|
@@ -101,33 +124,27 @@ On first boot (or if saved WiFi credentials are invalid), the device automatical
 | AP active, credentials exist | Retries STA connection every 30 seconds |
 | STA connects while AP active | Closes AP, switches to normal mode |
 
+**AP Details:**
 - **SSID**: Device name (default: `BambuTagger-AMS`)
 - **Security**: Open (no password)
 - **IP**: `192.168.4.1`
 - **Captive portal**: DNS redirects all domains to the config page
 
+---
+
 ## Web Interface
 
-Available at `http://<esp32-ip>` on your network, or `http://192.168.4.1` in AP mode.
+Open a browser to the ESP32's IP (shown on TFT), or `http://192.168.4.1` in AP mode.
 
-### Status Tab
-- **Merged Slot Status** — each slot shows AMS data (Type, Sub, Material, Color) + scanned tag data
-- **Color swatches** — 36x36px right-aligned per slot
-- **Tag info row** — `Tag: Bambu - PLA · C12E1FFF · 1000g/1000g`
-- **Printer AMS Cards** — all detected AMS units with tray grids
-- **Update Firmware** — one-click OTA from GitHub Releases
+| Tab | Description |
+|-----|-------------|
+| **Status** | Merged slot status with AMS data + scanned tag data, color swatches, printer AMS cards, OTA button |
+| **Printer Config** | Printer IP, Port (8883), Access Code, Serial Number, AMS Unit selector (A/B/C/D), MQTT settings |
+| **WiFi Config** | SSID, Password, Device Name |
 
-### Printer Config Tab
-- Printer IP, Port (default 8883), Access Code, Serial Number
-- **AMS Unit selector** (A/B/C/D)
+---
 
-### WiFi Config Tab
-- SSID, Password, Device Name
-
-### Footer
-- Sticky footer: `© 2026 by VID-PRO` with link to [www.vid-pro.de](https://www.vid-pro.de)
-
-## TFT Display (240x240 1.3" ST7789VW)
+## TFT Display (240×240 1.3" ST7789VW)
 
 ```
 ┌────────────────────────────────────────┐
@@ -143,55 +160,59 @@ Available at `http://<esp32-ip>` on your network, or `http://192.168.4.1` in AP 
 └────────────────────────────────────────┘
 ```
 
-OTA progress shown on TFT with header/footer preserved:
+OTA progress shown on TFT with header/footer preserved:  
 "OTA Update" → "Downloading..." → "Flashing... 45%" → auto-reboot
+
+---
 
 ## Printer Communication
 
 ### Subscribe
+
 - **Topic**: `device/<serial>/report`
 - **Data**: `push_status` (periodic, ~3KB), `get_version` responses
 
 ### Publish
+
 - **Topic**: `device/<serial>/request`
-- **`ams_filament_setting`** — structure:
-  ```json
-  {
-    "print": {
-      "sequence_id": "0",
-      "command": "ams_filament_setting",
-      "ams_id": 0,
-      "tray_id": 0,
-      "tray_info_idx": "GFA00",
-      "tray_color": "RRGGBBFF",
-      "nozzle_temp_min": 190,
-      "nozzle_temp_max": 230,
-      "tray_type": "PLA"
-    }
+
+**`ams_filament_setting`** structure:
+
+```json
+{
+  "print": {
+    "sequence_id": "0",
+    "command": "ams_filament_setting",
+    "ams_id": 0,
+    "tray_id": 0,
+    "tray_info_idx": "GFA00",
+    "tray_color": "RRGGBBFF",
+    "nozzle_temp_min": 190,
+    "nozzle_temp_max": 230,
+    "tray_type": "PLA"
   }
-  ```
+}
+```
+
 - `tray_type` derived from filament index prefix (GFA→PLA, GFG→PETG, etc.)
 - `tray_color` forced to RRGGBBFF format
 - `nozzle_temp_min/max` from tag block 6
 
+---
+
 ## Tag Format & Reading
 
+### Supported Tag Types
+
+| Tag Type | Format | Example |
+|----------|--------|---------|
+| **Bambu Lab** | MIFARE Classic 1K | `Bambu - PLA · C12E1FFF · 1000g/1000g` |
+| **SpoolEase** | NTAG, NDEF URI | `SpoolEase - PLA · 000000FF · 1000g/1036g` |
+| **TigerTag** | NTAG, binary v2.1 | `TigerTag - ASA-AF · F078B4FF · 1000g/1000g` |
+| **OpenSpool** | NTAG, NDEF JSON | `OpenSpool - ASA-AF · F078B4FF · 1000g/1000g` |
+| **OpenTag3D** | NTAG, MIME binary | `OpenTag3D - ASA-AF · F078B4FF · 1000g/1000g` |
+
 ### Bambu Lab (MIFARE Classic 1K)
-Tag: `Bambu - PLA · C12E1FFF · 1000g/1000g`
-
-### SpoolEase (NTAG, NDEF URI)
-Tag: `SpoolEase - PLA · 000000FF · 1000g/1036g`
-
-### TigerTag (NTAG, binary v2.1)
-Tag: `TigerTag - ASA-AF · F078B4FF · 1000g/1000g`
-
-### OpenSpool (NTAG, NDEF JSON)
-Tag: `OpenSpool - ASA-AF · F078B4FF · 1000g/1000g`
-
-### OpenTag3D (NTAG, MIME binary)
-Tag: `OpenTag3D - ASA-AF · F078B4FF · 1000g/1000g`
-
-Bambu Lab uses **MIFARE Classic 1K** tags with fixed block offsets:
 
 | Block | Content |
 |-------|---------|
@@ -202,13 +223,9 @@ Bambu Lab uses **MIFARE Classic 1K** tags with fixed block offsets:
 | 5 | RGBA color (bytes 0-3) + spool weight LE (bytes 4-5) |
 | 6 | Nozzle temps (bytes 8-11 LE) |
 
-### SpoolEase (NTAG)
+### SpoolEase (NTAG, NDEF URI)
 
-SpoolEase uses **NTAG** tags with NDEF URI records. The URL contains encoded spool data:
-
-`https://tag.spoolease.io/S1/?TG=...&M=PLA&CC=000000FF&SC=GFL99&WL=1000&WE=179&WF=1215&NN=190&NX=240`
-
-URL parameters parsed and mapped to SpoolInfo:
+URL format: `https://tag.spoolease.io/S1/?TG=...&M=PLA&CC=000000FF&SC=GFL99&WL=1000&WE=179&WF=1215&NN=190&NX=240`
 
 | Param | Field | Description |
 |-------|-------|-------------|
@@ -222,15 +239,7 @@ URL parameters parsed and mapped to SpoolInfo:
 | `NN=` | `nozzleTempMin` | Min nozzle temp °C |
 | `NX=` | `nozzleTempMax` | Max nozzle temp °C |
 
-Reading uses NDEF TLV parsing:
-- NDEF Message TLV (0x03) → NDEF record with TNF=WellKnown, type="U"
-- URI identifier code byte prepended to URI string
-- Non-printable bytes terminate the URI scan
-- Spool ID extracted from URL path after last `/`
-
-### TigerTag (NTAG, binary)
-
-TigerTag v2.1 uses **NTAG** chips with a raw 80/144-byte binary format (pages 0x04-0x27):
+### TigerTag (NTAG, binary v2.1)
 
 | Offset | Size | Field |
 |--------|------|-------|
@@ -244,9 +253,10 @@ TigerTag v2.1 uses **NTAG** chips with a raw 80/144-byte binary format (pages 0x
 | +26 | 2 | Nozzle Temp Max |
 | +76 | 3 | Measure Available |
 
-Known material IDs mapped from TigerTag database (PLA=38219, PETG=38256, ABS=20562...)
+Known material IDs: PLA=38219, PETG=38256, ABS=20562, etc.
 
 ### Authentication & Reading
+
 - **Tag auto-detect**: SAK-based type detection (MIFARE 1K vs NTAG)
 - **HKDF-SHA256** derives 16 per-sector Key A/B from 4-byte UID
 - Bambu KDF salt/info vectors from reverse-engineered firmware
@@ -257,6 +267,7 @@ Known material IDs mapped from TigerTag database (PLA=38219, PETG=38256, ABS=205
 - NTAG: page-level reads (page+=4, 4 pages per MIFARE_Read)
 
 ### Filament Type Mapping
+
 | Prefix | Type |
 |--------|------|
 | GFA-GFE, GFL | PLA |
@@ -264,6 +275,8 @@ Known material IDs mapped from TigerTag database (PLA=38219, PETG=38256, ABS=205
 | GFH, GFI | ABS |
 | GFJ | ASA |
 | GFK | TPU |
+
+---
 
 ## OTA Updates
 
@@ -275,12 +288,17 @@ Known material IDs mapped from TigerTag database (PLA=38219, PETG=38256, ABS=205
 - TFT shows "Checking version..." → "Downloading..." → "Flashing..." with percentage
 - Device auto-reboots after successful flash, web UI auto-reloads
 
+---
+
 ## CI / CD
 
 Workflow at `GHActions/release.yml`:
+
 - **On push/PR**: compiles sketch, uploads artifacts
 - **On release tag**: creates merged flash binary + OTA binary, attaches to GitHub Release
 - Arduino cache for fast rebuilds, pinned esp32:esp32@3.0.7 core
+
+---
 
 ## Configuration Defaults
 
@@ -300,3 +318,18 @@ Workflow at `GHActions/release.yml`:
 | RFID Poll Interval | 100 ms |
 | Firmware Version | 1.0.8 |
 
+---
+
+## Credits & References
+
+- [RFID-Tag-Guide](https://github.com/Bambu-Research-Group/RFID-Tag-Guide)
+- Display library: [Adafruit ST7735/ST7789](https://github.com/adafruit/Adafruit-ST7735-Library)
+- RFID library: [MFRC522-spi-i2c-uart-async](https://github.com/miguelbalboa/rfid)
+- OpenTag3D spec: [opentag3d.info](https://opentag3d.info)
+
+---
+
+## License
+
+This project is provided as-is for personal and educational use.  
+Bambu Lab trademarks and spool tag data formats are the property of Bambu Lab.
