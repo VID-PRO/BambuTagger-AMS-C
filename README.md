@@ -1,4 +1,4 @@
-# <img alt="logo" src="Logo/bambutagger.png" height="36" />  BambuTagger-AMS
+# <img alt="logo" src="Logo/bambutagger.png" height="36" />  BambuTagger-AMS-C
 
 Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament spool tags via RC522, displays live printer AMS tray data over MQTT, and sends RFID tag data to the printer/BMCU. Fully configurable via web interface with automatic AP fallback and OTA firmware updates.
 
@@ -88,7 +88,7 @@ All RC522 share the same SPI bus (MOSI, MISO, SCK). Each has its own SS and RST 
     - **Adafruit BME280 Library** by Adafruit
     - **mbedTLS** — bundled with ESP32 core, used for HKDF-SHA256
 
-3. Open `BambuTagger-AMS.ino`, select **ESP32 Dev Module** as board, and upload.
+3. Open `BambuTagger-AMS-C.ino`, select **ESP32 Dev Module** as board, and upload.
 
 ## WiFi & AP Mode
 
