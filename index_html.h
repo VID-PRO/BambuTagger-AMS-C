@@ -241,7 +241,9 @@ printerHtml+='</div>';
 printerHtml+='<div style="font-size:11px;color:#8b949e;margin-bottom:8px">';
 if(!u.productName||!u.productName[0]){printerHtml+='AMS '+(u.productName||'')}
 else printerHtml+=u.productName;
-printerHtml+=' &middot; FW '+(u.fwVer&&u.fwVer[0]?u.fwVer:'?')+' &middot; SN '+(u.serial&&u.serial[0]?u.serial:'?')+'</div>';
+if(u.fwVer&&u.fwVer[0]){printerHtml+=' &middot; FW '+u.fwVer}
+if(u.serial&&u.serial[0]){printerHtml+=' &middot; SN '+u.serial}
+printerHtml+='</div>';
 printerHtml+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
 for(var t=0;t<u.trays.length;t++){
 var tr=u.trays[t];

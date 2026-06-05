@@ -47,7 +47,7 @@ void BambuPrinter::update() {
 
   if (!mqttClient->connected()) {
     unsigned long now = millis();
-    if (now - lastReconnectAttempt > 30000) {
+    if (now - lastReconnectAttempt > 15000) {
       lastReconnectAttempt = now;
       reconnect();
     }
@@ -70,6 +70,10 @@ void BambuPrinter::reconnect() {
   if (!config.mqttEnabled || !mqttClient || !config.printerIP[0]) return;
 
   state = PRINTER_CONNECTING;
+
+  // Set TCP timeout to avoid long blocks when printer is offline
+  if (config.mqttUseTLS && tlsClient) tlsClient->setTimeout(2);
+  else if (tcpClient) tcpClient->setTimeout(2);
 
   char username[48];
   snprintf(username, sizeof(username), "bblp");
@@ -174,7 +178,7 @@ void BambuPrinter::requestPrinterStatus() {
   mqttClient->publish(topic, payload);
 
   snprintf(payload, sizeof(payload),
-           "{\"pushing\":{\"sequence_id\":\"0\",\"command\":\"pushall\"}}");
+           "{\"pushing\":{\"sequence_id\":\"0\",\"command\":\"pushall\",\"version\":1,\"push_target\":1}}");
   mqttClient->publish(topic, payload);
 }
 
@@ -263,7 +267,8 @@ void BambuPrinter::parseReport(JsonDocument &doc) {
               if (fw[0]) strncpy(detectedAms[id].fwVer, fw, 31);
               if (prod[0]) strncpy(detectedAms[id].productName, prod, 31);
               if (sn[0]) strncpy(detectedAms[id].serial, sn, 31);
-              Serial.printf("AMS%d: fw='%s' prod='%s' sn='%s'\n", id, fw, prod, sn);
+              if (!detectedAms[id].productName[0]) snprintf(detectedAms[id].productName, 31, "AMS %c", 'A' + id);
+              // Serial.printf("AMS%d: fw='%s' prod='%s' sn='%s'\n", id, fw, prod, sn);
             }
           }
         }
@@ -275,6 +280,9 @@ void BambuPrinter::parseReport(JsonDocument &doc) {
     amsDetected = true;
     for (uint8_t i = 0; i < MAX_DETECTED_AMS; i++) {
       detectedAms[i].connected = (amsExistBits & (1 << i)) != 0;
+      if (detectedAms[i].connected && !detectedAms[i].productName[0]) {
+        snprintf(detectedAms[i].productName, 31, "AMS %c", 'A' + i);
+      }
     }
   }
 }
