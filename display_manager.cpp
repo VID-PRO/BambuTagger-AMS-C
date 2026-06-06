@@ -79,7 +79,7 @@ void DisplayManager::drawStatusBar(bool wifiConnected) {
   display->setCursor(4, 4);
   display->print(deviceName);
 
-  const char* wifiText = wifiConnected ? "WiFi" : "NO WiFi";
+  const char* wifiText = wifiConnected ? "WiFi" : "AP";
   int16_t x = SCREEN_WIDTH - (strlen(wifiText) * 12) - 4;
   display->setCursor(x, 4);
   display->print(wifiText);
@@ -160,14 +160,14 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
       const char* col = printer->getAmsTrayColor(amsUnit, i);
       if (col && strlen(col) >= 6) {
         uint16_t swatchColor = hexToRgb565(col);
-        display->fillRect(4, y + 20, 14, 14, swatchColor);
-        display->drawRect(4, y + 20, 14, 14, ST77XX_WHITE);
+        display->fillRect(205, y, 30, 30, swatchColor);
+        display->drawRect(205, y, 30, 30, ST77XX_WHITE);
 
         char col6[7];
         strncpy(col6, col, 6);
         col6[6] = '\0';
         display->setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
-        display->setCursor(24, y + 20);
+        display->setCursor(32, y + 20);
         display->print("#");
         display->print(col6);
       }
@@ -190,13 +190,13 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
     display->printf("%.0fC", temp);
     display->setTextSize(3);
     display->setTextColor(ST77XX_BLUE, ST77XX_BLACK);
-    display->setCursor(80, 204);
+    display->setCursor(100, 209);
     display->printf("%.0f%%", humidity);
     display->setTextSize(1);
     display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     display->setCursor(4, 226);
     display->print(mqttConnected ? "MQTT:OK" : "MQTT:--");
-    display->setCursor(SCREEN_WIDTH - 50, 226);
+    display->setCursor(SCREEN_WIDTH - 40, 226);
     display->print(printerOnline ? "PTR:OK" : "PTR:--");
   } else {
     display->setTextSize(2);
