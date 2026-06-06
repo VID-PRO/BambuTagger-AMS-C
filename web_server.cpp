@@ -37,6 +37,7 @@ void WebInterface::setupRoutes() {
   server->on("/api/sync", HTTP_POST, std::bind(&WebInterface::handleSync, this));
   server->on("/api/ota", HTTP_POST, std::bind(&WebInterface::handleOta, this));
   server->on("/api/ota-check", HTTP_GET, std::bind(&WebInterface::handleOtaCheck, this));
+  server->on("/api/ams-get-rfid", HTTP_POST, std::bind(&WebInterface::handleAmsGetRfid, this));
   server->on("/api/version", HTTP_GET, std::bind(&WebInterface::handleVersion, this));
 }
 
@@ -302,6 +303,22 @@ void WebInterface::handleSync() {
   } else {
     doc["ok"] = false;
     doc["error"] = bambuPrinter ? "MQTT not connected" : "MQTT not configured";
+  }
+  sendJsonResponse(doc);
+}
+
+void WebInterface::handleAmsGetRfid() {
+  DynamicJsonDocument doc(128);
+  if (bambuPrinter && bambuPrinter->isConnected()) {
+    uint8_t tray = (uint8_t)(server->arg("tray").toInt());
+    if (tray < 4) {
+      bambuPrinter->sendAmsGetRfid(tray);
+      doc["ok"] = true;
+    } else {
+      doc["ok"] = false; doc["error"] = "Invalid tray";
+    }
+  } else {
+    doc["ok"] = false; doc["error"] = "MQTT not connected";
   }
   sendJsonResponse(doc);
 }

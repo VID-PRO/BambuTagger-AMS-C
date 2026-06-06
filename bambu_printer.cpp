@@ -116,6 +116,24 @@ void BambuPrinter::sendBmeData(float temp, float humidity) {
   mqttClient->publish(topic, payload);
 }
 
+void BambuPrinter::sendAmsGetRfid(uint8_t trayId) {
+  if (!config.mqttEnabled || !mqttClient || !mqttClient->connected()) return;
+
+  char topic[128];
+  snprintf(topic, sizeof(topic), "%s/%s/request",
+           config.mqttTopicPrefix, config.printerSerial);
+
+  char payload[128];
+  snprintf(payload, sizeof(payload),
+           "{\"print\":{\"sequence_id\":\"%lu\","
+           "\"command\":\"ams_get_rfid\","
+           "\"ams_id\":%d,"
+           "\"slot_id\":%d}}",
+           millis(), config.amsUnit, trayId);
+
+  mqttClient->publish(topic, payload);
+}
+
 void BambuPrinter::sendSpoolData(uint8_t slot, const SpoolInfo &info) {
   if (!config.mqttEnabled || !mqttClient || !mqttClient->connected()) return;
 

@@ -61,7 +61,7 @@ void LedManager::update() {
       case LED_TAG_COLOR: r = customR[i]; g = customG[i]; b = customB[i]; break;
       case LED_TAG_PRESENT: r = 128; g = 128; b = 0; break;
       case LED_ERROR: r = 255; g = 0; b = 0; break;
-      case LED_WIFI_DISCONNECTED: r = 255; g = 64; b = 0; break;
+      case LED_WIFI_DISCONNECTED: r = r = 160; g = 40; b = 0; break;  // was 255, 64, 0
       default: break;
     }
 

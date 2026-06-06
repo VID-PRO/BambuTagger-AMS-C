@@ -31,6 +31,7 @@ private:
   void drawFooter(bool mqttConnected, bool printerOnline, float temp = -99, float humidity = -1);
 
   Adafruit_ST7789* display;
+  SPIClass *hspi = NULL;
   char deviceName[32];
   unsigned long lastUpdate;
 };

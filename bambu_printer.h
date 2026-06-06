@@ -38,6 +38,7 @@ public:
   void sendSpoolData(uint8_t slot, const SpoolInfo &info);
   void requestPrinterStatus();
   void sendBmeData(float temp, float humidity);
+  void sendAmsGetRfid(uint8_t trayId);
   bool isConnected() const;
   bool isPrinterOnline() const { return printerOnline; }
   PrinterState getState() const;

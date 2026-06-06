@@ -28,8 +28,9 @@ const uint8_t RST_PINS[NUM_SLOTS] = {26, 25, 33, 32};
 #define TFT_BLK  2
 #define TFT_DC   4
 #define TFT_RES  5
-#define TFT_SCL  22
-#define TFT_SDA  21
+#define TFT_CS   -1
+#define TFT_SCL  16
+#define TFT_SDA  17
 
 // --- RFID Settings ---
 #define RFID_POLL_INTERVAL_MS  100

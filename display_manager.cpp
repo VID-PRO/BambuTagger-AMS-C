@@ -30,8 +30,13 @@ void DisplayManager::begin(const char* devName) {
   strncpy(deviceName, devName, sizeof(deviceName) - 1);
   pinMode(TFT_BLK, OUTPUT);
   digitalWrite(TFT_BLK, HIGH);
-  display = new Adafruit_ST7789(-1, TFT_DC, TFT_SDA, TFT_SCL, TFT_RES);
-  display->init(240, 240);
+
+  hspi = new SPIClass(HSPI);
+  hspi->begin(TFT_SCL, -1, TFT_SDA, -1);
+  display = new Adafruit_ST7789(hspi, TFT_CS, TFT_DC, TFT_RES);
+
+  display->init(240, 240, SPI_MODE3); 
+  display->setSPISpeed(40000000);
   display->setRotation(0);
   display->fillScreen(ST77XX_BLACK);
   display->setTextSize(2);
@@ -45,7 +50,7 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
                             uint8_t amsUnit, float temp, float humidity) {
   if (!display) return;
   unsigned long now = millis();
-  if (now - lastUpdate < 500) return;
+  if (now - lastUpdate < 2000) return;
   lastUpdate = now;
 
   display->fillScreen(ST77XX_BLACK);
@@ -239,6 +244,6 @@ void DisplayManager::showBootScreen() {
   display->drawBitmap(x, y, SPLASH_BITMAP, SPLASH_WIDTH, SPLASH_HEIGHT, ST77XX_WHITE);
   display->setTextSize(2);
   display->setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-  display->setCursor((SCREEN_WIDTH - 18 * 12) / 2, y + SPLASH_HEIGHT + 16);
+  display->setCursor((SCREEN_WIDTH - 18 * 12), y + SPLASH_HEIGHT + 16);
   display->print("BambuTagger-AMS");
 }

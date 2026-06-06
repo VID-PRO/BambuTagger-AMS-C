@@ -61,13 +61,7 @@ void setup() {
 
   loadConfig(cfg);
 
-  displayManager.begin(cfg.deviceName);
-  displayManager.showBootScreen();
-  delay(2000);
-
-  Serial.print(F("Device: "));
-  Serial.println(cfg.deviceName);
-
+  Wire.begin();
   bmeOk = bme.begin(0x76);
   if (!bmeOk) bmeOk = bme.begin(0x77);
   if (bmeOk) {
@@ -76,12 +70,20 @@ void setup() {
     Serial.println(F("BME280 not found"));
   }
 
+  Serial.print(F("Device: "));
+  Serial.println(cfg.deviceName);
+
   ledManager.begin();
   ledManager.setAllLeds(LED_IDLE);
   ledManager.update();
 
   rfidManager.begin();
   Serial.println(F("RFID readers initialized"));
+
+  displayManager.begin(cfg.deviceName);
+  Serial.println(F("TFT initialized"));
+  displayManager.showBootScreen();
+  delay(2000);
 
   connectWiFi();
 
@@ -164,7 +166,7 @@ void loop() {
     ledManager.update();
   }
 
-  if (now - lastDisplayUpdate > 1000) {
+  if (now - lastDisplayUpdate > 2000) {
     lastDisplayUpdate = now;
     SpoolInfo displaySlots[NUM_SLOTS];
     for (uint8_t i = 0; i < NUM_SLOTS; i++) {
@@ -330,9 +332,9 @@ void performOTAUpdate() {
   filter["tag_name"] = true;
   JsonArray fa = filter.createNestedArray("assets");
   JsonObject fa0 = fa.createNestedObject();
-  fa0["name"]                 = true;
+  fa0["name"] = true;
   fa0["browser_download_url"] = true;
-  fa0["size"]                 = true;
+  fa0["size"] = true;
 
   DynamicJsonDocument doc(8192);
   DeserializationError err = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
@@ -368,8 +370,7 @@ void performOTAUpdate() {
   int binSize = 0;
   for (JsonObject asset : assets) {
     String name = asset["name"] | "";
-    if (name.endsWith(".bin") && name.indexOf("merged") < 0 &&
-        name.indexOf("bootloader") < 0 && name.indexOf("partition") < 0) {
+    if (name.endsWith(".bin") && name.indexOf("merged") < 0 && name.indexOf("bootloader") < 0 && name.indexOf("partition") < 0) {
       dlUrl = asset["browser_download_url"] | "";
       binSize = asset["size"] | 0;
       break;
@@ -395,7 +396,10 @@ void performOTAUpdate() {
     dl.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     dl.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
     int dlCode = dl.GET();
-    if (dlCode != 200) { dl.end(); continue; }
+    if (dlCode != 200) {
+      dl.end();
+      continue;
+    }
 
     int totalSize = (binSize > 0) ? binSize : dl.getSize();
     if (!Update.begin((totalSize > 0) ? (size_t)totalSize : UPDATE_SIZE_UNKNOWN)) {
@@ -415,7 +419,8 @@ void performOTAUpdate() {
       int avail = stream->available();
       if (!avail) {
         if (written > 0 && millis() - stallSince > 5000) break;
-        delay(2); continue;
+        delay(2);
+        continue;
       }
       stallSince = millis();
       int n = stream->readBytes(buf, min(avail, (int)sizeof(buf)));

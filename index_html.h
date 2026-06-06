@@ -196,7 +196,7 @@ var t=tagBySlot[i];
 var hasSpool=p.hasSpool;
 var showColor=t&&t.colorHex?t.colorHex.substring(0,6):(p.hasSpool&&p.color?p.color.substring(0,6):null);
 h+='<div class="slot">';
-h+='<div class="slot-title"><span class="led '+(p.hasSpool?'led-green':'led-yellow')+'"></span>Slot '+(i+1)+'</div>';
+h+='<div class="slot-title"><span class="led '+(p.hasSpool?'led-green':'led-yellow')+'"></span>Slot '+(i+1)+' <button class="btn btn-secondary" style="font-size:10px;padding:2px 6px;margin-left:8px" onclick="readAmsSlot('+i+')">Read</button></div>';
 h+='<div style="display:flex;align-items:center;gap:8px">';
 h+='<div class="slot-detail" style="flex:1">';
 if(p.hasSpool){
@@ -288,6 +288,10 @@ function sendAll(){fetch('/api/send',{method:'POST'}).then(function(r){return r.
 function syncPrinter(){fetch('/api/sync',{method:'POST'}).then(function(r){return r.json()})
 .then(function(d){showToast(d.ok?'Syncing from printer...':'Sync failed: '+d.error,d.ok)})
 .catch(function(){showToast('Sync failed',false)})}
+
+function readAmsSlot(tray){fetch('/api/ams-get-rfid?tray='+tray,{method:'POST'}).then(function(r){return r.json()})
+.then(function(d){showToast(d.ok?'Reading AMS slot...':'Failed: '+d.error,d.ok)})
+.catch(function(){showToast('Read failed',false)})}
 
 function updateFirmware(){
 var b=document.getElementById('otaBtn');
