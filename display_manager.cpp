@@ -35,7 +35,7 @@ void DisplayManager::begin(const char* devName) {
   hspi->begin(TFT_SCL, -1, TFT_SDA, -1);
   display = new Adafruit_ST7789(hspi, TFT_CS, TFT_DC, TFT_RES);
 
-  display->init(240, 240, SPI_MODE3); 
+  display->init(240, 240, SPI_MODE3);
   //display->setSPISpeed(40000000);
   display->setRotation(0);
   display->fillScreen(ST77XX_BLACK);
@@ -54,13 +54,22 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
   lastUpdate = now;
 
   //display->fillScreen(ST77XX_BLACK);
-  drawStatusBar(wifiConnected);
+  if (wifiConnected != wifiConnectedOld) {
+    drawStatusBar(wifiConnected);
+    wifiConnectedOld = wifiConnected;
+  }
   if (mqttConnected && printer && printer->isAmsDetected(amsUnit)) {
     drawPrinterSlots(printer, amsUnit);
   } else {
     drawSlotGrid(slots);
   }
-  drawFooter(mqttConnected, printer ? printer->isPrinterOnline() : false, temp, humidity);
+  if (mqttConnected != mqttConnectedOld || temp != tempOld || humidity != humidityOld || printer->isPrinterOnline() != printerOld) {
+    drawFooter(mqttConnected, printer ? printer->isPrinterOnline() : false, temp, humidity);
+    mqttConnectedOld = mqttConnected;
+    tempOld = temp;
+    humidityOld = humidity;
+    printerOld = printer->isPrinterOnline();
+  }
 }
 
 void DisplayManager::drawStatusBar(bool wifiConnected) {
@@ -80,7 +89,7 @@ void DisplayManager::drawStatusBar(bool wifiConnected) {
 void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
   display->setTextSize(2);
 
-  display->fillRect(0, 24, SCREEN_WIDTH, 175, ST77XX_BLACK);
+  display->fillRect(0, 24, SCREEN_WIDTH, 170, ST77XX_BLACK);
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     uint8_t y = 30 + (i * 42);
@@ -110,7 +119,8 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
 
       if (slots[i].totalGrams > 0) {
         uint8_t pct = (uint16_t)((uint32_t)slots[i].remainingGrams * 100 / slots[i].totalGrams);
-        uint16_t pctColor = (pct > 50) ? ST77XX_GREEN : (pct > 20) ? ST77XX_YELLOW : ST77XX_RED;
+        uint16_t pctColor = (pct > 50) ? ST77XX_GREEN : (pct > 20) ? ST77XX_YELLOW
+                                                                   : ST77XX_RED;
         display->setTextColor(pctColor, ST77XX_BLACK);
         display->setCursor(SCREEN_WIDTH - 48, y + 20);
         display->printf("%3d%%", pct);
@@ -178,6 +188,7 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
     display->setTextColor(ST77XX_ORANGE, ST77XX_BLACK);
     display->setCursor(4, 204);
     display->printf("%.0fC", temp);
+    display->setTextSize(3);
     display->setTextColor(ST77XX_BLUE, ST77XX_BLACK);
     display->setCursor(80, 204);
     display->printf("%.0f%%", humidity);
@@ -185,7 +196,7 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
     display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     display->setCursor(4, 226);
     display->print(mqttConnected ? "MQTT:OK" : "MQTT:--");
-    display->setCursor(SCREEN_WIDTH - 60, 226);
+    display->setCursor(SCREEN_WIDTH - 50, 226);
     display->print(printerOnline ? "PTR:OK" : "PTR:--");
   } else {
     display->setTextSize(2);
@@ -198,7 +209,7 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
 }
 
 void DisplayManager::showOtaProgress(const char* line1, const char* line2,
-                                      const char* line3, int pct) {
+                                     const char* line3, int pct) {
   if (!display) return;
   display->fillScreen(ST77XX_BLACK);
   drawStatusBar(true);
@@ -207,8 +218,14 @@ void DisplayManager::showOtaProgress(const char* line1, const char* line2,
   display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
   display->setCursor(4, 36);
   if (line1) display->println(line1);
-  if (line2) { display->setCursor(4, 60); display->println(line2); }
-  if (line3) { display->setCursor(4, 84); display->println(line3); }
+  if (line2) {
+    display->setCursor(4, 60);
+    display->println(line2);
+  }
+  if (line3) {
+    display->setCursor(4, 84);
+    display->println(line3);
+  }
 
   if (pct >= 0) {
     int barY = 130;
@@ -228,7 +245,7 @@ void DisplayManager::showOtaProgress(const char* line1, const char* line2,
 }
 
 void DisplayManager::showMessage(const char* line1, const char* line2,
-                                  const char* line3, const char* line4) {
+                                 const char* line3, const char* line4) {
   if (!display) return;
   display->fillScreen(ST77XX_BLACK);
   display->setTextSize(2);

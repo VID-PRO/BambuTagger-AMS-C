@@ -61,6 +61,11 @@ void setup() {
 
   loadConfig(cfg);
 
+  displayManager.begin(cfg.deviceName);
+  Serial.println(F("TFT initialized"));
+  displayManager.showBootScreen();
+  delay(2000);
+
   Wire.begin();
   bmeOk = bme.begin(0x76);
   if (!bmeOk) bmeOk = bme.begin(0x77);
@@ -79,11 +84,6 @@ void setup() {
 
   rfidManager.begin();
   Serial.println(F("RFID readers initialized"));
-
-  displayManager.begin(cfg.deviceName);
-  Serial.println(F("TFT initialized"));
-  displayManager.showBootScreen();
-  delay(2000);
 
   connectWiFi();
 

@@ -34,6 +34,11 @@ private:
   SPIClass *hspi = NULL;
   char deviceName[32];
   unsigned long lastUpdate;
+  bool wifiConnectedOld = false;
+  bool mqttConnectedOld = false;
+  bool printerOld = false;
+  float tempOld = 0.0;
+  float humidityOld = 0.0;
 };
 
 #endif
