@@ -36,7 +36,7 @@ void DisplayManager::begin(const char* devName) {
   display = new Adafruit_ST7789(hspi, TFT_CS, TFT_DC, TFT_RES);
 
   display->init(240, 240, SPI_MODE3); 
-  display->setSPISpeed(40000000);
+  //display->setSPISpeed(40000000);
   display->setRotation(0);
   display->fillScreen(ST77XX_BLACK);
   display->setTextSize(2);
@@ -50,10 +50,10 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
                             uint8_t amsUnit, float temp, float humidity) {
   if (!display) return;
   unsigned long now = millis();
-  if (now - lastUpdate < 2000) return;
+  if (now - lastUpdate < 1000) return;
   lastUpdate = now;
 
-  display->fillScreen(ST77XX_BLACK);
+  //display->fillScreen(ST77XX_BLACK);
   drawStatusBar(wifiConnected);
   if (mqttConnected && printer && printer->isAmsDetected(amsUnit)) {
     drawPrinterSlots(printer, amsUnit);
@@ -79,6 +79,8 @@ void DisplayManager::drawStatusBar(bool wifiConnected) {
 
 void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
   display->setTextSize(2);
+
+  display->fillRect(0, 24, SCREEN_WIDTH, 175, ST77XX_BLACK);
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     uint8_t y = 30 + (i * 42);
@@ -138,9 +140,10 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
     const char* ttype = printer->getAmsTrayType(amsUnit, i);
     if (ttype && ttype[0]) {
       display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-      char matShort[13];
+      char matShort[14];
       strncpy(matShort, ttype, 12);
-      matShort[12] = '\0';
+      matShort[12] = ' ';
+      matShort[13] = '\0';
       display->setCursor(32, y);
       display->print(matShort);
 
@@ -161,13 +164,14 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
     } else {
       display->setTextColor(0x6B4D, ST77XX_BLACK);
       display->setCursor(32, y);
-      display->print("empty");
+      display->print("empty     ");
     }
   }
 }
 
 void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float temp, float humidity) {
   display->drawFastHLine(0, 198, SCREEN_WIDTH, ST77XX_WHITE);
+  display->fillRect(0, 199, 240, 41, ST77XX_BLACK);
 
   if (temp > -99) {
     display->setTextSize(2);
@@ -243,7 +247,7 @@ void DisplayManager::showBootScreen() {
   int16_t y = (SCREEN_HEIGHT - SPLASH_HEIGHT) / 2 - 20;
   display->drawBitmap(x, y, SPLASH_BITMAP, SPLASH_WIDTH, SPLASH_HEIGHT, ST77XX_WHITE);
   display->setTextSize(2);
-  display->setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+  display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
   display->setCursor((SCREEN_WIDTH - 18 * 12), y + SPLASH_HEIGHT + 16);
   display->print("BambuTagger-AMS");
 }
