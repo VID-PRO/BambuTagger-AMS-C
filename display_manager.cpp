@@ -37,7 +37,7 @@ void DisplayManager::begin(const char* devName) {
 
   display->init(240, 240, SPI_MODE3);
   //display->setSPISpeed(40000000);
-  display->setRotation(0);
+  display->setRotation(2);
   display->fillScreen(ST77XX_BLACK);
   display->setTextSize(2);
   display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
