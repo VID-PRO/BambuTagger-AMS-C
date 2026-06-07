@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
-#define FIRMWARE_VERSION "1.1.0"
+#define FIRMWARE_VERSION "1.1.1"
 #define OTA_REPO "VID-PRO/BambuTagger-AMS-C"
 
 #define NUM_SLOTS 4
