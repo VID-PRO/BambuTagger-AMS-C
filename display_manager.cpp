@@ -53,7 +53,6 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
   if (now - lastUpdate < 1000) return;
   lastUpdate = now;
 
-  //display->fillScreen(ST77XX_BLACK);
   if (wifiConnected != wifiConnectedOld) {
     drawStatusBar(wifiConnected);
     wifiConnectedOld = wifiConnected;
@@ -79,10 +78,15 @@ void DisplayManager::drawStatusBar(bool wifiConnected) {
   display->setCursor(4, 4);
   display->print(deviceName);
 
-  const char* wifiText = wifiConnected ? "WF" : "AP";
-  int16_t x = SCREEN_WIDTH - (strlen(wifiText) * 12) - 4;
-  display->setCursor(x, 4);
-  display->print(wifiText);
+  if (wifiConnected == true) {
+    int16_t x = SCREEN_WIDTH - 20;
+    display->drawBitmap(x, 4, WIFI_BITMAP, WIFI_WIDTH, WIFI_HEIGHT, ST77XX_BLACK);
+  } else {
+    int16_t x = SCREEN_WIDTH - (2 * 12) - 4;
+    display->setCursor(x, 4);
+    display->print("AP");
+  }
+  
   display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
 }
 

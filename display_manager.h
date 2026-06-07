@@ -8,6 +8,7 @@
 #include "config.h"
 #include "bambu_printer.h"
 #include "splash_logo.h"
+#include "wifi_icon.h"
 
 #define SCREEN_WIDTH  240
 #define SCREEN_HEIGHT 240
