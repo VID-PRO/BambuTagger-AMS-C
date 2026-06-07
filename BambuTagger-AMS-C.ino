@@ -20,6 +20,7 @@
 #include <HTTPClient.h>
 #include <Update.h>
 #include <Adafruit_BME280.h>
+#include <HTTPUpdate.h>
 
 #include "config.h"
 #include "rfid_manager.h"
@@ -312,70 +313,74 @@ void handleReboot() {
 void performOTAUpdate() {
   displayManager.showOtaProgress("OTA Update", "Checking version...");
 
-  WiFiClientSecure client;
-  client.setInsecure();
-  HTTPClient http;
-
-  http.begin(client, String("https://api.github.com/repos/") + OTA_REPO + "/releases/latest");
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
-
-  int code = http.GET();
-  if (code != 200) {
-    http.end();
-    displayManager.showOtaProgress("OTA Update", "", "GitHub API error");
-    delay(3000);
-    return;
-  }
-
-  StaticJsonDocument<96> filter;
-  filter["tag_name"] = true;
-  JsonArray fa = filter.createNestedArray("assets");
-  JsonObject fa0 = fa.createNestedObject();
-  fa0["name"] = true;
-  fa0["browser_download_url"] = true;
-  fa0["size"] = true;
-
-  DynamicJsonDocument doc(8192);
-  DeserializationError err = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
-  http.end();
-  if (err) {
-    displayManager.showOtaProgress("OTA Update", "", "JSON parse error");
-    delay(3000);
-    return;
-  }
-
-  String tag = doc["tag_name"] | "";
-  if (tag.startsWith("v") || tag.startsWith("V")) tag = tag.substring(1);
-  if (!tag.length()) {
-    displayManager.showOtaProgress("OTA Update", "", "No release found");
-    delay(3000);
-    return;
-  }
-
-  // Version check
-  int rMaj = 0, rMin = 0, rPat = 0, lMaj = 0, lMin = 0, lPat = 0;
-  sscanf(tag.c_str(), "%d.%d.%d", &rMaj, &rMin, &rPat);
-  const char* l = FIRMWARE_VERSION;
-  if (l[0] == 'v' || l[0] == 'V') l++;
-  sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
-  if (rMaj * 10000 + rMin * 100 + rPat <= lMaj * 10000 + lMin * 100 + lPat) {
-    displayManager.showOtaProgress("OTA Update", "", "Already up to date");
-    delay(3000);
-    return;
-  }
-
-  JsonArray assets = doc["assets"];
   String dlUrl;
   int binSize = 0;
-  for (JsonObject asset : assets) {
-    String name = asset["name"] | "";
-    if (name.endsWith(".bin") && name.indexOf("merged") < 0 && name.indexOf("bootloader") < 0 && name.indexOf("partition") < 0) {
-      dlUrl = asset["browser_download_url"] | "";
-      binSize = asset["size"] | 0;
-      break;
+  String tag;
+
+  // ── scope block: client + doc destroyed here, frees ~45KB before download ──
+  {
+    WiFiClientSecure client;
+    client.setInsecure();
+    HTTPClient http;
+    http.begin(client, String("https://api.github.com/repos/") + OTA_REPO + "/releases/latest");
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
+
+    int code = http.GET();
+    if (code != 200) {
+      http.end();
+      displayManager.showOtaProgress("OTA Update", "", "GitHub API error");
+      delay(3000);
+      return;
     }
-  }
+
+    StaticJsonDocument<96> filter;
+    filter["tag_name"] = true;
+    JsonArray fa = filter.createNestedArray("assets");
+    JsonObject fa0 = fa.createNestedObject();
+    fa0["name"] = true;
+    fa0["browser_download_url"] = true;
+    fa0["size"] = true;
+
+    DynamicJsonDocument doc(8192);
+    DeserializationError err = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
+    http.end();
+
+    if (err) {
+      displayManager.showOtaProgress("OTA Update", "", "JSON parse error");
+      delay(3000);
+      return;
+    }
+
+    tag = doc["tag_name"] | "";
+    if (tag.startsWith("v") || tag.startsWith("V")) tag = tag.substring(1);
+    if (!tag.length()) {
+      displayManager.showOtaProgress("OTA Update", "", "No release found");
+      delay(3000);
+      return;
+    }
+
+    int rMaj = 0, rMin = 0, rPat = 0, lMaj = 0, lMin = 0, lPat = 0;
+    sscanf(tag.c_str(), "%d.%d.%d", &rMaj, &rMin, &rPat);
+    const char* l = FIRMWARE_VERSION;
+    if (l[0] == 'v' || l[0] == 'V') l++;
+    sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
+    if (rMaj * 10000 + rMin * 100 + rPat <= lMaj * 10000 + lMin * 100 + lPat) {
+      displayManager.showOtaProgress("OTA Update", "", "Already up to date");
+      delay(3000);
+      return;
+    }
+
+    for (JsonObject asset : doc["assets"].as<JsonArray>()) {
+      String name = asset["name"] | "";
+      if (name.endsWith(".bin") && name.indexOf("merged") < 0
+          && name.indexOf("bootloader") < 0 && name.indexOf("partition") < 0) {
+        dlUrl = asset["browser_download_url"] | "";
+        binSize = asset["size"] | 0;
+        break;
+      }
+    }
+  } // ← client, http, doc all destroyed here — heap reclaimed
 
   if (!dlUrl.length()) {
     displayManager.showOtaProgress("OTA Update", "", "No .bin found");
@@ -385,62 +390,33 @@ void performOTAUpdate() {
 
   displayManager.showOtaProgress("OTA Update", "Downloading...", tag.c_str());
 
-  for (int retry = 0; retry < 3; retry++) {
-    if (retry > 0) {
-      displayManager.showOtaProgress("OTA Update", "Retrying...", tag.c_str(), 0);
-      delay(2000);
-    }
+  httpUpdate.onProgress([](int written, int total) {
+    Serial.printf("[OTA] progress: %d / %d: %d\n", written, total, (int)(((float)written / (float)total) * 100.0));
+    displayManager.showOtaProgress("OTA Update", "", "", (int)(((float)written / (float)total) * 100.0));
+  });
+  httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
 
-    HTTPClient dl;
-    dl.begin(client, dlUrl);
-    dl.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-    dl.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
-    int dlCode = dl.GET();
-    if (dlCode != 200) {
-      dl.end();
-      continue;
-    }
+  WiFiClientSecure dlClient;
+  dlClient.setInsecure();
 
-    int totalSize = (binSize > 0) ? binSize : dl.getSize();
-    if (!Update.begin((totalSize > 0) ? (size_t)totalSize : UPDATE_SIZE_UNKNOWN)) {
-      dl.end();
-      displayManager.showOtaProgress("OTA Update", "", "Update begin failed");
+  Serial.printf("[OTA] dlUrl: %s\n", dlUrl.c_str());
+  Serial.printf("[OTA] free heap: %d\n", ESP.getFreeHeap());  // should be ~100KB+ now
+
+  t_httpUpdate_return ret = httpUpdate.update(dlClient, dlUrl);
+
+  switch (ret) {
+    case HTTP_UPDATE_OK:
+      displayManager.showOtaProgress("OTA Update", "", "OK");
+      break;
+    case HTTP_UPDATE_FAILED:
+      Serial.printf("[OTA] failed (%d): %s\n",
+                    httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
+      displayManager.showOtaProgress("OTA Update", "", httpUpdate.getLastErrorString().c_str());
+      delay(5000);
+      break;
+    case HTTP_UPDATE_NO_UPDATES:
+      displayManager.showOtaProgress("OTA Update", "", "No update available");
       delay(3000);
-      return;
-    }
-
-    WiFiClient* stream = dl.getStreamPtr();
-    uint8_t buf[512];
-    int written = 0;
-    unsigned long lastDraw = 0;
-    unsigned long stallSince = millis();
-
-    while (dl.connected() && (totalSize <= 0 || written < totalSize)) {
-      int avail = stream->available();
-      if (!avail) {
-        if (written > 0 && millis() - stallSince > 5000) break;
-        delay(2);
-        continue;
-      }
-      stallSince = millis();
-      int n = stream->readBytes(buf, min(avail, (int)sizeof(buf)));
-      if (n <= 0) break;
-      if (Update.write(buf, n) != (size_t)n) { break; }
-      written += n;
-      if (millis() - lastDraw > 200) {
-        int pct = (totalSize > 0) ? (written * 100 / totalSize) : 50;
-        displayManager.showOtaProgress("OTA Update", "Flashing...", tag.c_str(), pct);
-        lastDraw = millis();
-      }
-    }
-    dl.end();
-
-    if (written >= totalSize && Update.end(true)) {
-      return;
-    }
-    Update.abort();
+      break;
   }
-
-  displayManager.showOtaProgress("OTA Update", "", "Update failed");
-  delay(5000);
 }

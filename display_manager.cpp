@@ -224,8 +224,8 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
       }
     } else {
       display->setTextColor(0x6B4D, ST77XX_BLACK);
-      //display->setCursor(32, y);
-      //display->print("empty     ");
+      display->setCursor(32, y);
+      display->print("empty     ");
       display->drawRect(205, y, 30, 30, 0x6B4D);
       display->setCursor(212, y + 5);
       display->setTextSize(3);
