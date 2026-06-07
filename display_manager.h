@@ -40,6 +40,11 @@ private:
   bool printerOld = false;
   float tempOld = 0.0;
   float humidityOld = 0.0;
+  SpoolInfo _lastSlots[NUM_SLOTS];
+  bool _lastPrinterMode = false;
+  char _lastTrayType[NUM_SLOTS][16];
+  char _lastTrayColor[NUM_SLOTS][9];
+  bool _dirty = true;
 };
 
 #endif

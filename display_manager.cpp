@@ -57,10 +57,46 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
     drawStatusBar(wifiConnected);
     wifiConnectedOld = wifiConnected;
   }
-  if (mqttConnected && printer && printer->isAmsDetected(amsUnit)) {
-    drawPrinterSlots(printer, amsUnit);
+  bool printerMode = mqttConnected && printer && printer->isAmsDetected(amsUnit);
+  bool modeChanged = (printerMode != _lastPrinterMode);
+  _lastPrinterMode = printerMode;
+
+  if (_dirty) {
+    display->fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ST77XX_BLACK);
+    drawStatusBar(wifiConnectedOld);
+    memset(_lastSlots, 0, sizeof(_lastSlots));   // invalidate slot cache
+    _lastPrinterMode = !printerMode;             // invalidate mode cache → forces redraw
+    memset(_lastTrayType, 0, sizeof(_lastTrayType));
+    memset(_lastTrayColor, 0, sizeof(_lastTrayColor));
+    tempOld = -999; humidityOld = -999;          // invalidate footer cache
+    mqttConnectedOld = !mqttConnected;
+    _dirty = false;
+  }
+
+  if (printerMode) {
+    bool changed = modeChanged;
+    for (uint8_t i = 0; i < NUM_SLOTS && !changed; i++) {
+      const char* t = printer->getAmsTrayType(amsUnit, i);
+      const char* c = printer->getAmsTrayColor(amsUnit, i);
+      if (strcmp(t ? t : "", _lastTrayType[i]) != 0) changed = true;
+      if (strcmp(c ? c : "", _lastTrayColor[i]) != 0) changed = true;
+    }
+    if (changed) {
+      drawPrinterSlots(printer, amsUnit);
+      for (uint8_t i = 0; i < NUM_SLOTS; i++) {
+        const char* t = printer->getAmsTrayType(amsUnit, i);
+        const char* c = printer->getAmsTrayColor(amsUnit, i);
+        strncpy(_lastTrayType[i], t ? t : "", 15);
+        _lastTrayType[i][15] = '\0';
+        strncpy(_lastTrayColor[i], c ? c : "", 8);
+        _lastTrayColor[i][8] = '\0';
+      }
+    }
   } else {
-    drawSlotGrid(slots);
+    if (modeChanged || memcmp(slots, _lastSlots, sizeof(SpoolInfo) * NUM_SLOTS) != 0) {
+      drawSlotGrid(slots);
+      memcpy(_lastSlots, slots, sizeof(SpoolInfo) * NUM_SLOTS);
+    }
   }
   if (mqttConnected != mqttConnectedOld || temp != tempOld || humidity != humidityOld || printer->isPrinterOnline() != printerOld) {
     drawFooter(mqttConnected, printer ? printer->isPrinterOnline() : false, temp, humidity);
@@ -86,17 +122,19 @@ void DisplayManager::drawStatusBar(bool wifiConnected) {
     display->setCursor(x, 4);
     display->print("AP");
   }
-  
+
   display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
 }
 
 void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
   display->setTextSize(2);
 
-  display->fillRect(0, 24, SCREEN_WIDTH, 170, ST77XX_BLACK);
-
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     uint8_t y = 30 + (i * 42);
+    display->fillRect(4,  y + 20, 14, 14, ST77XX_BLACK);
+    display->fillRect(205, y, 30, 30, ST77XX_BLACK);
+    display->fillRect(32, y, 170, 16, ST77XX_BLACK); 
+    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK); 
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -135,8 +173,8 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
       display->print("reading...");
     } else {
       display->setTextColor(0x6B4D, ST77XX_BLACK);
-      //display->setCursor(32, y);
-      //display->print("empty");
+      display->setCursor(32, y);
+      display->print("empty");
       display->drawRect(205, y, 30, 30, 0x6B4D);
       display->setCursor(212, y + 5);
       display->setTextSize(3);
@@ -151,6 +189,10 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     uint8_t y = 30 + (i * 42);
+    display->fillRect(4,  y + 20, 14, 14, ST77XX_BLACK);
+    display->fillRect(205, y, 30, 30, ST77XX_BLACK);
+    display->fillRect(32, y, 170, 16, ST77XX_BLACK); 
+    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK); 
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -195,13 +237,12 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
 
 void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float temp, float humidity) {
   display->drawFastHLine(0, 198, SCREEN_WIDTH, ST77XX_GREEN);
-  display->fillRect(0, 199, 240, 41, ST77XX_BLACK);
 
   if (temp > -99) {
     display->setTextSize(2);
     display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     display->setCursor(4, 204);
-    display->printf("%.0fC", temp);
+    display->printf("%-2.0fC", temp);
     display->setTextSize(3);
     if (humidity < 30) {
       display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
@@ -211,37 +252,22 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
       display->setTextColor(ST77XX_RED, ST77XX_BLACK);
     }
     display->setCursor(100, 209);
-    display->printf("%.0f%%", humidity);
-    display->setTextSize(2);
-    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    display->setCursor(4, 226);
-    display->print("MQTT:");
-    display->setCursor(64, 226);
-    mqttConnected ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
-    display->print(mqttConnected ? "OK" : "--");
-    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    display->setCursor(SCREEN_WIDTH - 73, 226);
-    display->print("PTR:");
-    display->setCursor(SCREEN_WIDTH - 24, 226);
-    printerOnline ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
-    display->print(printerOnline ? "OK" : "--");
-    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-  } else {
-    display->setTextSize(2);
-    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    display->setCursor(4, 210);
-    display->print("MQTT:");
-    display->setCursor(64, 210);
-    mqttConnected ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
-    display->print(mqttConnected ? "OK" : "--");
-    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-    display->setCursor(SCREEN_WIDTH - 73, 210);
-    display->print("PTR:");
-    display->setCursor(SCREEN_WIDTH - 24, 210);
-    printerOnline ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
-    display->print(printerOnline ? "OK" : "--");
-    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    display->printf("%-2.0f%%", humidity);  // padded
   }
+  display->setTextSize(2);
+  display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  display->setCursor(4, 226);
+  display->print("MQTT:");
+  display->setCursor(64, 226);
+  mqttConnected ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
+  display->print(mqttConnected ? "OK" : "--");
+  display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+  display->setCursor(SCREEN_WIDTH - 73, 226);
+  display->print("PTR:");
+  display->setCursor(SCREEN_WIDTH - 24, 226);
+  printerOnline ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
+  display->print(printerOnline ? "OK" : "--");
+  display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
 }
 
 void DisplayManager::showOtaProgress(const char* line1, const char* line2,
@@ -278,6 +304,7 @@ void DisplayManager::showOtaProgress(const char* line1, const char* line2,
   }
 
   drawFooter(false, false);
+  _dirty = true;
 }
 
 void DisplayManager::showMessage(const char* line1, const char* line2,
@@ -291,6 +318,7 @@ void DisplayManager::showMessage(const char* line1, const char* line2,
   if (line2) display->println(line2);
   if (line3) display->println(line3);
   if (line4) display->println(line4);
+  _dirty = true;
 }
 
 void DisplayManager::showBootScreen() {
@@ -305,4 +333,5 @@ void DisplayManager::showBootScreen() {
   display->print("BambuTagger");
   display->setCursor((SCREEN_WIDTH - 5 * 12) / 2, y + SPLASH_HEIGHT + 16);
   display->print("AMS-C");
+  _dirty = true;
 }

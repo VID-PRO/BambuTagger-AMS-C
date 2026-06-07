@@ -42,7 +42,7 @@ Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament sp
 | **4x WS2812** addressable LEDs | Daisy-chained, single data pin | https://de.aliexpress.com/item/32560280169.html |
 | **240×240 1.3" TFT** | ST7789VW SPI display | https://www.aliexpress.com/item/1005007094147766.html |
 | **BME280** sensor | Temperature/humidity, I2C | https://de.aliexpress.com/item/1005006824236173.html |
-| **PCB** | DIY PCB from JLPCB | https://oshwlab.com/bambutagger/project_hdkkdlsn |
+| **PCB** | DIY PCB from JLPCB<br/>only > v1.2 | https://oshwlab.com/bambutagger/project_hdkkdlsn |
 
 ### Pin Assignments
 
@@ -78,6 +78,13 @@ Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament sp
 | Signal | GPIO |
 |--------|------|
 | Data | 15 |
+
+**BME280**
+
+| Signal | GPIO |
+|--------|------|
+| SCL | 21 |
+| SDA | 22 |
 
 ---
 
