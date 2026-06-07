@@ -195,7 +195,7 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
 
   if (temp > -99) {
     display->setTextSize(2);
-    display->setTextColor(ST77XX_ORANGE, ST77XX_BLACK);
+    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     display->setCursor(4, 204);
     display->printf("%.0fC", temp);
     display->setTextSize(3);
@@ -211,7 +211,7 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
     display->setTextSize(2);
     display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     display->setCursor(4, 226);
-  	display->print("MQTT:");
+    display->print("MQTT:");
     display->setCursor(64, 226);
     mqttConnected ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
     display->print(mqttConnected ? "OK" : "--");
@@ -237,7 +237,6 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
     printerOnline ? display->setTextColor(ST77XX_GREEN, ST77XX_BLACK) : display->setTextColor(ST77XX_RED, ST77XX_BLACK);
     display->print(printerOnline ? "OK" : "--");
     display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-
   }
 }
 
@@ -294,10 +293,12 @@ void DisplayManager::showBootScreen() {
   if (!display) return;
   display->fillScreen(ST77XX_BLACK);
   int16_t x = (SCREEN_WIDTH - SPLASH_WIDTH) / 2;
-  int16_t y = (SCREEN_HEIGHT - SPLASH_HEIGHT) / 2 - 20;
-  display->drawBitmap(x, y, SPLASH_BITMAP, SPLASH_WIDTH, SPLASH_HEIGHT, ST77XX_WHITE);
+  int16_t y = (SCREEN_HEIGHT - SPLASH_HEIGHT) / 2 - 40;
+  display->drawBitmap(x, y, SPLASH_BITMAP, SPLASH_WIDTH, SPLASH_HEIGHT, ST77XX_GREEN);
   display->setTextSize(2);
   display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-  display->setCursor((SCREEN_WIDTH - 18 * 12), y + SPLASH_HEIGHT + 16);
-  display->print("BambuTagger-AMS");
+  display->setCursor((SCREEN_WIDTH - 11 * 12) / 2, y + SPLASH_HEIGHT);
+  display->print("BambuTagger");
+  display->setCursor((SCREEN_WIDTH - 5 * 12) / 2, y + SPLASH_HEIGHT + 16);
+  display->print("AMS-C");
 }
