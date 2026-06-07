@@ -8,6 +8,7 @@ Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament sp
 <img src="Pics/printer.png" />
 <img src="Pics/status.png" />
 <img src="Pics/pcb-c.png" />
+<img src="Pics/tft.jng" />
 </p>
 
 ---
