@@ -67,8 +67,8 @@ Multi-spool NFC tag reader for Bambu Lab printers. Reads 4 Bambu Lab filament sp
 
 | Signal | GPIO |
 |--------|------|
-| SDA (MOSI) | 21 |
-| SCL (SCK) | 22 |
+| SDA (MOSI) | 17 |
+| SCL (SCK) | 16 |
 | DC | 4 |
 | RES | 5 |
 | BLK (Backlight) | 2 |
