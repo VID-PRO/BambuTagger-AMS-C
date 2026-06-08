@@ -64,11 +64,12 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
   if (_dirty) {
     display->fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, ST77XX_BLACK);
     drawStatusBar(wifiConnectedOld);
-    memset(_lastSlots, 0, sizeof(_lastSlots));   // invalidate slot cache
-    _lastPrinterMode = !printerMode;             // invalidate mode cache → forces redraw
+    memset(_lastSlots, 0, sizeof(_lastSlots));  // invalidate slot cache
+    _lastPrinterMode = !printerMode;            // invalidate mode cache → forces redraw
     memset(_lastTrayType, 0, sizeof(_lastTrayType));
     memset(_lastTrayColor, 0, sizeof(_lastTrayColor));
-    tempOld = -999; humidityOld = -999;          // invalidate footer cache
+    tempOld = -999;
+    humidityOld = -999;  // invalidate footer cache
     mqttConnectedOld = !mqttConnected;
     _dirty = false;
   }
@@ -131,10 +132,10 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     uint8_t y = 30 + (i * 42);
-    display->fillRect(4,  y + 20, 14, 14, ST77XX_BLACK);
+    display->fillRect(4, y + 20, 14, 14, ST77XX_BLACK);
     display->fillRect(205, y, 30, 30, ST77XX_BLACK);
-    display->fillRect(32, y, 170, 16, ST77XX_BLACK); 
-    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK); 
+    display->fillRect(32, y, 170, 16, ST77XX_BLACK);
+    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK);
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -189,10 +190,10 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     uint8_t y = 30 + (i * 42);
-    display->fillRect(4,  y + 20, 14, 14, ST77XX_BLACK);
+    display->fillRect(4, y + 20, 14, 14, ST77XX_BLACK);
     display->fillRect(205, y, 30, 30, ST77XX_BLACK);
-    display->fillRect(32, y, 170, 16, ST77XX_BLACK); 
-    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK); 
+    display->fillRect(32, y, 170, 16, ST77XX_BLACK);
+    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK);
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -273,37 +274,52 @@ void DisplayManager::drawFooter(bool mqttConnected, bool printerOnline, float te
 void DisplayManager::showOtaProgress(const char* line1, const char* line2,
                                      const char* line3, int pct) {
   if (!display) return;
-  display->fillScreen(ST77XX_BLACK);
-  drawStatusBar(true);
 
-  display->setTextSize(2);
-  display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
-  display->setCursor(4, 36);
-  if (line1) display->println(line1);
-  if (line2) {
-    display->setCursor(4, 60);
-    display->println(line2);
-  }
-  if (line3) {
-    display->setCursor(4, 84);
-    display->println(line3);
+  const int barY = 130;
+  const int barW = SCREEN_WIDTH - 16;
+
+  bool firstDraw = (_lastOtaPct == -1);
+
+  if (firstDraw) {
+    display->fillScreen(ST77XX_BLACK);  // ← only on first call
+    drawStatusBar(true);
+
+    display->setTextSize(2);
+    display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+    if (line1) {
+      display->setCursor(4, 36);
+      display->println(line1);
+    }
+    if (line2) {
+      display->setCursor(4, 60);
+      display->println(line2);
+    }
+    if (line3) {
+      display->setCursor(4, 84);
+      display->println(line3);
+    }
+
+    if (pct >= 0) {
+      display->drawRect(4, barY, barW + 8, 24, ST77XX_WHITE);  // bar outline once
+    }
+    drawFooter(false, false);
   }
 
   if (pct >= 0) {
-    int barY = 130;
-    int barW = SCREEN_WIDTH - 16;
-    display->drawRect(4, barY, barW + 8, 24, ST77XX_WHITE);
+    // Clear and redraw only the bar fill
+    display->fillRect(8, barY + 4, barW, 16, ST77XX_BLACK);
     if (pct > 0) {
       uint16_t barColor = (pct < 100) ? ST77XX_CYAN : ST77XX_GREEN;
       display->fillRect(8, barY + 4, (barW * pct) / 100, 16, barColor);
     }
+    // Clear and redraw only the pct text (fixed width avoids ghost digits)
     display->setTextSize(2);
     display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
     display->setCursor(SCREEN_WIDTH / 2 - 24, barY + 30);
-    display->printf("%d%%", pct);
+    display->printf("%3d%%", pct);
   }
 
-  drawFooter(false, false);
+  _lastOtaPct = pct;
   _dirty = true;
 }
 
@@ -318,6 +334,7 @@ void DisplayManager::showMessage(const char* line1, const char* line2,
   if (line2) display->println(line2);
   if (line3) display->println(line3);
   if (line4) display->println(line4);
+  _lastOtaPct = -1;
   _dirty = true;
 }
 
@@ -333,5 +350,6 @@ void DisplayManager::showBootScreen() {
   display->print("BambuTagger");
   display->setCursor((SCREEN_WIDTH - 5 * 12) / 2, y + SPLASH_HEIGHT + 16);
   display->print("AMS-C");
+  _lastOtaPct = -1;
   _dirty = true;
 }

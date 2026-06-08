@@ -329,56 +329,52 @@ void WebInterface::handleOtaCheck() {
 
   WiFiClientSecure client;
   client.setInsecure();
+  client.setTimeout(10000);
   HTTPClient http;
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  String url = String("https://api.github.com/repos/") + OTA_REPO + "/releases/latest";
+  http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);  // we want the 302, not the destination
+  String url = String("https://github.com/") + OTA_REPO + "/releases/latest";
 
   if (!http.begin(client, url)) {
-    doc["error"] = "HTTP begin failed";
+    doc["error"] = "begin failed";
     sendJsonResponse(doc);
     return;
   }
   http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
+  const char* hdrs[] = {"Location"};
+  http.collectHeaders(hdrs, 1);
 
   int code = http.GET();
-  if (code != 200) {
-    doc["error"] = "GitHub API error";
-    http.end();
-    sendJsonResponse(doc);
-    return;
+  String latest = "";
+
+  if ((code == 301 || code == 302) && http.hasHeader("Location")) {
+    String loc = http.header("Location");
+    // loc looks like: /VID-PRO/BambuTagger-AMS-C/releases/tag/v1.1.1
+    int tagIdx = loc.lastIndexOf("/tag/");
+    if (tagIdx >= 0) latest = loc.substring(tagIdx + 5);
   }
-
-  StaticJsonDocument<64> filter;
-  filter["tag_name"] = true;
-
-  DynamicJsonDocument doc2(512);
-  DeserializationError err = deserializeJson(doc2, http.getStream(), DeserializationOption::Filter(filter));
   http.end();
 
-  if (err) {
-    doc["error"] = "JSON parse error";
+  if (latest.isEmpty()) {
+    doc["error"] = String("HTTP ") + code;
     sendJsonResponse(doc);
     return;
   }
 
-  const char* latest = doc2["tag_name"] | "";
   doc["latest"] = latest;
 
-  // Compare versions numerically (strip leading 'v')
-  const char* r = latest;
+  const char* r = latest.c_str();
   if (r[0] == 'v' || r[0] == 'V') r++;
   const char* l = FIRMWARE_VERSION;
   if (l[0] == 'v' || l[0] == 'V') l++;
 
-  int rMaj = 0, rMin = 0, rPat = 0, lMaj = 0, lMin = 0, lPat = 0;
+  int rMaj=0,rMin=0,rPat=0,lMaj=0,lMin=0,lPat=0;
   sscanf(r, "%d.%d.%d", &rMaj, &rMin, &rPat);
   sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
 
-  int rVer = rMaj * 10000 + rMin * 100 + rPat;
-  int lVer = lMaj * 10000 + lMin * 100 + lPat;
-  doc["newer"] = (latest[0] != '\0' && rVer > lVer);
+  doc["newer"] = ((rMaj*10000+rMin*100+rPat) > (lMaj*10000+lMin*100+lPat));
   sendJsonResponse(doc);
 }
+
 void WebInterface::handleOta() {
   DynamicJsonDocument doc(128);
   doc["ok"] = true;

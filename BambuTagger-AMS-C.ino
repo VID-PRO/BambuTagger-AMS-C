@@ -51,6 +51,8 @@ void connectWiFi();
 void startCaptivePortal();
 void updateLedStatus();
 
+SET_LOOP_TASK_STACK_SIZE(16 * 1024);
+
 void setup() {
   Serial.begin(115200);
   delay(1500);
@@ -317,70 +319,55 @@ void performOTAUpdate() {
   int binSize = 0;
   String tag;
 
-  // ── scope block: client + doc destroyed here, frees ~45KB before download ──
-  {
+    {
+    // Get latest tag via redirect — no API, no rate limits, no JSON
     WiFiClientSecure client;
     client.setInsecure();
+    client.setTimeout(10000);
     HTTPClient http;
-    http.begin(client, String("https://api.github.com/repos/") + OTA_REPO + "/releases/latest");
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    http.begin(client, String("https://github.com/") + OTA_REPO + "/releases/latest");
     http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
+    const char* hdrs[] = {"Location"};
+    http.collectHeaders(hdrs, 1);
 
     int code = http.GET();
-    if (code != 200) {
-      http.end();
-      displayManager.showOtaProgress("OTA Update", "", "GitHub API error");
-      delay(3000);
-      return;
+    String latest = "";
+    if ((code == 301 || code == 302) && http.hasHeader("Location")) {
+      String loc = http.header("Location");
+      int tagIdx = loc.lastIndexOf("/tag/");
+      if (tagIdx >= 0) latest = loc.substring(tagIdx + 5);
     }
-
-    StaticJsonDocument<96> filter;
-    filter["tag_name"] = true;
-    JsonArray fa = filter.createNestedArray("assets");
-    JsonObject fa0 = fa.createNestedObject();
-    fa0["name"] = true;
-    fa0["browser_download_url"] = true;
-    fa0["size"] = true;
-
-    DynamicJsonDocument doc(8192);
-    DeserializationError err = deserializeJson(doc, http.getStream(), DeserializationOption::Filter(filter));
     http.end();
 
-    if (err) {
-      displayManager.showOtaProgress("OTA Update", "", "JSON parse error");
-      delay(3000);
-      return;
-    }
-
-    tag = doc["tag_name"] | "";
-    if (tag.startsWith("v") || tag.startsWith("V")) tag = tag.substring(1);
-    if (!tag.length()) {
+    if (latest.isEmpty()) {
       displayManager.showOtaProgress("OTA Update", "", "No release found");
       delay(3000);
       return;
     }
 
-    int rMaj = 0, rMin = 0, rPat = 0, lMaj = 0, lMin = 0, lPat = 0;
-    sscanf(tag.c_str(), "%d.%d.%d", &rMaj, &rMin, &rPat);
+    // Version check
+    tag = latest;
+    const char* r = latest.c_str();
+    if (r[0] == 'v' || r[0] == 'V') r++;
     const char* l = FIRMWARE_VERSION;
     if (l[0] == 'v' || l[0] == 'V') l++;
+    int rMaj=0,rMin=0,rPat=0,lMaj=0,lMin=0,lPat=0;
+    sscanf(r, "%d.%d.%d", &rMaj, &rMin, &rPat);
     sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
-    if (rMaj * 10000 + rMin * 100 + rPat <= lMaj * 10000 + lMin * 100 + lPat) {
+    if (rMaj*10000+rMin*100+rPat <= lMaj*10000+lMin*100+lPat) {
       displayManager.showOtaProgress("OTA Update", "", "Already up to date");
       delay(3000);
       return;
     }
 
-    for (JsonObject asset : doc["assets"].as<JsonArray>()) {
-      String name = asset["name"] | "";
-      if (name.endsWith(".bin") && name.indexOf("merged") < 0
-          && name.indexOf("bootloader") < 0 && name.indexOf("partition") < 0) {
-        dlUrl = asset["browser_download_url"] | "";
-        binSize = asset["size"] | 0;
-        break;
-      }
-    }
-  } // ← client, http, doc all destroyed here — heap reclaimed
+    // Construct download URL directly — no asset JSON needed
+    dlUrl = String("https://github.com/") + OTA_REPO
+          + "/releases/download/" + latest
+          + "/BambuTagger-AMS-C.ino.bin";
+    Serial.printf("[OTA] tag: %s\n", latest.c_str());
+    Serial.printf("[OTA] dlUrl: %s\n", dlUrl.c_str());
+  } // ← client, http destroyed here — heap reclaimed
 
   if (!dlUrl.length()) {
     displayManager.showOtaProgress("OTA Update", "", "No .bin found");
@@ -394,15 +381,33 @@ void performOTAUpdate() {
     Serial.printf("[OTA] progress: %d / %d: %d\n", written, total, (int)(((float)written / (float)total) * 100.0));
     displayManager.showOtaProgress("OTA Update", "", "", (int)(((float)written / (float)total) * 100.0));
   });
-  httpUpdate.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  
+  String finalUrl = dlUrl;
+  {
+    WiFiClientSecure rc;
+    rc.setInsecure();
+    rc.setTimeout(10000);
+    HTTPClient rh;
+    const char* hdrs[] = {"Location"};
+    rh.collectHeaders(hdrs, 1);
+    rh.begin(rc, dlUrl);
+    rh.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
+    rh.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
+    int code = rh.GET();
+    Serial.printf("[OTA] redirect code: %d\n", code);
+    if ((code == 301 || code == 302) && rh.hasHeader("Location")) {
+      finalUrl = rh.header("Location");
+      Serial.printf("[OTA] CDN URL: %s\n", finalUrl.c_str());
+    }
+    rh.end();
+  }
 
   WiFiClientSecure dlClient;
   dlClient.setInsecure();
+  dlClient.setTimeout(30000);
 
-  Serial.printf("[OTA] dlUrl: %s\n", dlUrl.c_str());
-  Serial.printf("[OTA] free heap: %d\n", ESP.getFreeHeap());  // should be ~100KB+ now
-
-  t_httpUpdate_return ret = httpUpdate.update(dlClient, dlUrl);
+  Serial.printf("[OTA] free heap before download: %d\n", ESP.getFreeHeap());
+  t_httpUpdate_return ret = httpUpdate.update(dlClient, finalUrl);
 
   switch (ret) {
     case HTTP_UPDATE_OK:

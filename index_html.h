@@ -327,7 +327,7 @@ fetch('/api/ota',{method:'POST'}).then(function(r){return r.json()})
 function checkOta(){
 fetch('/api/ota-check').then(function(r){return r.json()}).then(function(v){
 var b=document.getElementById('otaBtn');
-if(v.error){b.textContent='OTA: error';b.disabled=true;return}
+if(v.error){b.textContent='OTA: '+v.error;b.disabled=true;return}
 if(v.newer){b.textContent='Update to '+v.latest;b.className='btn btn-primary'}
 else{b.textContent='Firmware up to date ('+v.current+')';b.className='btn btn-secondary'}
 })}

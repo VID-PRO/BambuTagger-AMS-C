@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
-#define FIRMWARE_VERSION "1.1.1"
+#define FIRMWARE_VERSION "1.1.0"
 #define OTA_REPO "VID-PRO/BambuTagger-AMS-C"
 
 #define NUM_SLOTS 4
@@ -22,7 +22,7 @@ const uint8_t RST_PINS[NUM_SLOTS] = {26, 25, 33, 32};
 // WS2812 LED daisy chain (single data pin, 4 LEDs in series)
 #define LED_DATA_PIN   15
 #define LED_COUNT      4
-#define LED_BRIGHTNESS 64
+#define LED_BRIGHTNESS 32
 
 // SPI TFT (240x240 1.3" ST7789VW)
 #define TFT_BLK  2

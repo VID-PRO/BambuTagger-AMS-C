@@ -45,6 +45,7 @@ private:
   char _lastTrayType[NUM_SLOTS][16];
   char _lastTrayColor[NUM_SLOTS][9];
   bool _dirty = true;
+  int _lastOtaPct = -1;
 };
 
 #endif
