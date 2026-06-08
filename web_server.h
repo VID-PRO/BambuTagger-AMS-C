@@ -32,6 +32,8 @@ private:
   void handleOtaCheck();
   void handleAmsGetRfid();
   void handleVersion();
+  void handleLedGet();
+  void handleLedPost();
   void sendJsonResponse(JsonDocument &doc, int code = 200);
   void setupRoutes();
 

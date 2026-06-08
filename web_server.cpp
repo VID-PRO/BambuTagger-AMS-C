@@ -9,7 +9,7 @@ extern bool bmeOk;
 #include "index_html.h"
 #include "favicon.h"
 
-void WebInterface::begin(SystemConfig &cfg, RfidManager* rfid, BambuPrinter* printer,
+void WebInterface::begin(SystemConfig& cfg, RfidManager* rfid, BambuPrinter* printer,
                          void (*rebootCallback)(void), void (*otaCallback)(void)) {
   config = &cfg;
   rfidManager = rfid;
@@ -39,6 +39,8 @@ void WebInterface::setupRoutes() {
   server->on("/api/ota-check", HTTP_GET, std::bind(&WebInterface::handleOtaCheck, this));
   server->on("/api/ams-get-rfid", HTTP_POST, std::bind(&WebInterface::handleAmsGetRfid, this));
   server->on("/api/version", HTTP_GET, std::bind(&WebInterface::handleVersion, this));
+  server->on("/api/led/brightness", HTTP_POST, std::bind(&WebInterface::handleLedPost, this));
+  server->on("/api/led/brightness", HTTP_GET, std::bind(&WebInterface::handleLedGet, this));
 }
 
 void WebInterface::handleClient() {
@@ -46,7 +48,7 @@ void WebInterface::handleClient() {
 }
 
 void WebInterface::updateStatus(bool wifiConnected, const char* ip,
-                                 bool mqttConnected, bool printerOnline) {
+                                bool mqttConnected, bool printerOnline) {
   wifiStatus = wifiConnected;
   ipAddress = ip ? String(ip) : "";
   mqttStatus = mqttConnected;
@@ -82,7 +84,9 @@ void WebInterface::handleStatus() {
     for (uint8_t a = 0; a < 4; a++) {
       JsonObject unit = amsList.createNestedObject();
       unit["id"] = a;
-      unit["label"] = (const char*)(a == 0 ? "A" : a == 1 ? "B" : a == 2 ? "C" : "D");
+      unit["label"] = (const char*)(a == 0 ? "A" : a == 1 ? "B"
+                                                 : a == 2 ? "C"
+                                                          : "D");
       unit["connected"] = bambuPrinter->isAmsDetected(a);
       unit["fwVer"] = bambuPrinter->getAmsFwVer(a);
       unit["productName"] = bambuPrinter->getAmsProductName(a);
@@ -146,14 +150,16 @@ void WebInterface::handleStatus() {
 void WebInterface::handleAmsStatus() {
   DynamicJsonDocument doc(512);
   doc["configuredUnit"] = config->amsUnit;
-  doc["configuredLabel"] = (const char*)(config->amsUnit == 0 ? "A" : config->amsUnit == 1 ? "B" : config->amsUnit == 2 ? "C" : "D");
+  doc["configuredLabel"] = (const char*)(config->amsUnit == 0 ? "A" : config->amsUnit == 1 ? "B"
+                                                                    : config->amsUnit == 2 ? "C"
+                                                                                           : "D");
   doc["detected"] = bambuPrinter ? bambuPrinter->isAmsDetected(config->amsUnit) : false;
   doc["existBits"] = bambuPrinter ? bambuPrinter->getAmsExistBits() : 0;
   doc["count"] = bambuPrinter ? bambuPrinter->getDetectedAmsCount() : 0;
 
   JsonArray units = doc.createNestedArray("units");
   if (bambuPrinter) {
-    const char* labels[] = {"A", "B", "C", "D"};
+    const char* labels[] = { "A", "B", "C", "D" };
     for (uint8_t a = 0; a < 4; a++) {
       JsonObject unit = units.createNestedObject();
       unit["id"] = a;
@@ -315,10 +321,12 @@ void WebInterface::handleAmsGetRfid() {
       bambuPrinter->sendAmsGetRfid(tray);
       doc["ok"] = true;
     } else {
-      doc["ok"] = false; doc["error"] = "Invalid tray";
+      doc["ok"] = false;
+      doc["error"] = "Invalid tray";
     }
   } else {
-    doc["ok"] = false; doc["error"] = "MQTT not connected";
+    doc["ok"] = false;
+    doc["error"] = "MQTT not connected";
   }
   sendJsonResponse(doc);
 }
@@ -340,7 +348,7 @@ void WebInterface::handleOtaCheck() {
     return;
   }
   http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
-  const char* hdrs[] = {"Location"};
+  const char* hdrs[] = { "Location" };
   http.collectHeaders(hdrs, 1);
 
   int code = http.GET();
@@ -367,11 +375,11 @@ void WebInterface::handleOtaCheck() {
   const char* l = FIRMWARE_VERSION;
   if (l[0] == 'v' || l[0] == 'V') l++;
 
-  int rMaj=0,rMin=0,rPat=0,lMaj=0,lMin=0,lPat=0;
+  int rMaj = 0, rMin = 0, rPat = 0, lMaj = 0, lMin = 0, lPat = 0;
   sscanf(r, "%d.%d.%d", &rMaj, &rMin, &rPat);
   sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
 
-  doc["newer"] = ((rMaj*10000+rMin*100+rPat) > (lMaj*10000+lMin*100+lPat));
+  doc["newer"] = ((rMaj * 10000 + rMin * 100 + rPat) > (lMaj * 10000 + lMin * 100 + lPat));
   sendJsonResponse(doc);
 }
 
@@ -394,7 +402,35 @@ void WebInterface::handleVersion() {
   sendJsonResponse(doc);
 }
 
-void WebInterface::sendJsonResponse(JsonDocument &doc, int code) {
+void WebInterface::handleLedGet() {
+  Preferences prefs;
+  prefs.begin("bambu-ams", true);
+  int currentBrightness = prefs.getUChar("brightness", 32);
+  prefs.end();
+  DynamicJsonDocument doc(128);
+  doc["brightness"] = String(currentBrightness);
+  sendJsonResponse(doc);
+}
+
+void WebInterface::handleLedPost() {
+  DynamicJsonDocument doc(128);
+
+  int brightness = 32;
+  brightness = server->arg("value").toInt();
+  if (brightness >= 0 && brightness <= 255) {
+    Preferences prefs;
+    prefs.begin("bambu-ams", false);
+    prefs.putUChar("brightness", brightness);
+    prefs.end();
+    doc["brightness"] = String(brightness);
+    sendJsonResponse(doc);
+    return;
+  }
+  doc["error"] = "Invalid brightness value (0-255)";
+  sendJsonResponse(doc);
+}
+
+void WebInterface::sendJsonResponse(JsonDocument& doc, int code) {
   String response;
   serializeJson(doc, response);
   server->send(code, "application/json", response);

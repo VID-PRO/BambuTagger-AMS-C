@@ -81,7 +81,15 @@ void setup() {
   Serial.print(F("Device: "));
   Serial.println(cfg.deviceName);
 
+
   ledManager.begin();
+  Preferences prefs;
+  prefs.begin("led", false);
+  uint8_t savedBrightness = prefs.getUChar("brightness", LED_BRIGHTNESS);
+  prefs.end();
+
+  ledManager.setBrightness(savedBrightness);
+
   ledManager.setAllLeds(LED_IDLE);
   ledManager.update();
 
@@ -319,7 +327,7 @@ void performOTAUpdate() {
   int binSize = 0;
   String tag;
 
-    {
+  {
     // Get latest tag via redirect — no API, no rate limits, no JSON
     WiFiClientSecure client;
     client.setInsecure();
@@ -328,7 +336,7 @@ void performOTAUpdate() {
     http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
     http.begin(client, String("https://github.com/") + OTA_REPO + "/releases/latest");
     http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
-    const char* hdrs[] = {"Location"};
+    const char* hdrs[] = { "Location" };
     http.collectHeaders(hdrs, 1);
 
     int code = http.GET();
@@ -352,10 +360,10 @@ void performOTAUpdate() {
     if (r[0] == 'v' || r[0] == 'V') r++;
     const char* l = FIRMWARE_VERSION;
     if (l[0] == 'v' || l[0] == 'V') l++;
-    int rMaj=0,rMin=0,rPat=0,lMaj=0,lMin=0,lPat=0;
+    int rMaj = 0, rMin = 0, rPat = 0, lMaj = 0, lMin = 0, lPat = 0;
     sscanf(r, "%d.%d.%d", &rMaj, &rMin, &rPat);
     sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
-    if (rMaj*10000+rMin*100+rPat <= lMaj*10000+lMin*100+lPat) {
+    if (rMaj * 10000 + rMin * 100 + rPat <= lMaj * 10000 + lMin * 100 + lPat) {
       displayManager.showOtaProgress("OTA Update", "", "Already up to date");
       delay(3000);
       return;
@@ -363,11 +371,11 @@ void performOTAUpdate() {
 
     // Construct download URL directly — no asset JSON needed
     dlUrl = String("https://github.com/") + OTA_REPO
-          + "/releases/download/" + latest
-          + "/BambuTagger-AMS-C.ino.bin";
+            + "/releases/download/" + latest
+            + "/BambuTagger-AMS-C.ino.bin";
     Serial.printf("[OTA] tag: %s\n", latest.c_str());
     Serial.printf("[OTA] dlUrl: %s\n", dlUrl.c_str());
-  } // ← client, http destroyed here — heap reclaimed
+  }  // ← client, http destroyed here — heap reclaimed
 
   if (!dlUrl.length()) {
     displayManager.showOtaProgress("OTA Update", "", "No .bin found");
@@ -381,14 +389,14 @@ void performOTAUpdate() {
     Serial.printf("[OTA] progress: %d / %d: %d\n", written, total, (int)(((float)written / (float)total) * 100.0));
     displayManager.showOtaProgress("OTA Update", "", "", (int)(((float)written / (float)total) * 100.0));
   });
-  
+
   String finalUrl = dlUrl;
   {
     WiFiClientSecure rc;
     rc.setInsecure();
     rc.setTimeout(10000);
     HTTPClient rh;
-    const char* hdrs[] = {"Location"};
+    const char* hdrs[] = { "Location" };
     rh.collectHeaders(hdrs, 1);
     rh.begin(rc, dlUrl);
     rh.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);

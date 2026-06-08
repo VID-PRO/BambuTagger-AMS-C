@@ -141,6 +141,41 @@ border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite}
 </div>
 <div class="actions"><button class="btn btn-primary" onclick="savePrinter()">Save Printer Settings</button></div>
 </div>
+<div class="card">
+<h2>LED Brightness</h2>
+<div class="row">
+<div class="col">
+  <label>LED Brightness:</label>
+  <input type="range" id="brightnessSlider" min="0" max="255" value="32">
+  <span id="brightnessValue">32</span>
+</div>
+</div>
+</div>
+
+<script>
+  const slider = document.getElementById('brightnessSlider');
+  const display = document.getElementById('brightnessValue');
+
+  // Fetch current brightness on load
+  fetch('/api/led/brightness')
+    .then(response => response.json())
+    .then(data => {
+      slider.value = data.brightness;
+      display.textContent = data.brightness;
+    });
+
+  // Send new brightness when slider changes
+  slider.addEventListener('input', () => {
+    const val = slider.value;
+    display.textContent = val;
+    fetch('/api/led/brightness', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `value=${val}`
+    });
+  });
+</script>
+</div>
 </div>
 
 <div id="page-wifi" class="page">
