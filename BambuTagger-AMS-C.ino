@@ -22,6 +22,9 @@
 #include <Adafruit_BME280.h>
 #include <HTTPUpdate.h>
 
+#include <esp_http_client.h>
+#include <esp_ota_ops.h>
+
 #include "config.h"
 #include "rfid_manager.h"
 #include "led_manager.h"
@@ -321,6 +324,9 @@ void handleReboot() {
 }
 
 void performOTAUpdate() {
+  static bool otaRunning = false;
+  if (otaRunning) return;
+  otaRunning = true;
   displayManager.showOtaProgress("OTA Update", "Checking version...");
 
   String dlUrl;
@@ -329,10 +335,10 @@ void performOTAUpdate() {
 
   {
     // Get latest tag via redirect — no API, no rate limits, no JSON
-    WiFiClientSecure client;
+    WiFiClientSecure client;  // ← add this
+    HTTPClient http;          // ← add this
     client.setInsecure();
     client.setTimeout(10000);
-    HTTPClient http;
     http.setFollowRedirects(HTTPC_DISABLE_FOLLOW_REDIRECTS);
     http.begin(client, String("https://github.com/") + OTA_REPO + "/releases/latest");
     http.addHeader("User-Agent", String("BambuTagger-AMS/") + FIRMWARE_VERSION);
@@ -350,6 +356,7 @@ void performOTAUpdate() {
 
     if (latest.isEmpty()) {
       displayManager.showOtaProgress("OTA Update", "", "No release found");
+      otaRunning = false;
       delay(3000);
       return;
     }
@@ -365,6 +372,7 @@ void performOTAUpdate() {
     sscanf(l, "%d.%d.%d", &lMaj, &lMin, &lPat);
     if (rMaj * 10000 + rMin * 100 + rPat <= lMaj * 10000 + lMin * 100 + lPat) {
       displayManager.showOtaProgress("OTA Update", "", "Already up to date");
+      otaRunning = false;
       delay(3000);
       return;
     }
@@ -379,16 +387,12 @@ void performOTAUpdate() {
 
   if (!dlUrl.length()) {
     displayManager.showOtaProgress("OTA Update", "", "No .bin found");
+    otaRunning = false;
     delay(3000);
     return;
   }
 
   displayManager.showOtaProgress("OTA Update", "Downloading...", tag.c_str());
-
-  httpUpdate.onProgress([](int written, int total) {
-    Serial.printf("[OTA] progress: %d / %d: %d\n", written, total, (int)(((float)written / (float)total) * 100.0));
-    displayManager.showOtaProgress("OTA Update", "", "", (int)(((float)written / (float)total) * 100.0));
-  });
 
   String finalUrl = dlUrl;
   {
@@ -410,26 +414,116 @@ void performOTAUpdate() {
     rh.end();
   }
 
+    // Raw WiFiClientSecure — same as redirect blocks, bypasses IDF TLS enforcement
+  String dlHost, dlPath;
+  {
+    String u = finalUrl;
+    if (u.startsWith("https://")) u = u.substring(8);
+    int si = u.indexOf('/');
+    dlHost = (si >= 0) ? u.substring(0, si) : u;
+    dlPath = (si >= 0) ? u.substring(si) : "/";
+  }
+
   WiFiClientSecure dlClient;
   dlClient.setInsecure();
   dlClient.setTimeout(30000);
 
-  Serial.printf("[OTA] free heap before download: %d\n", ESP.getFreeHeap());
-  t_httpUpdate_return ret = httpUpdate.update(dlClient, finalUrl);
-
-  switch (ret) {
-    case HTTP_UPDATE_OK:
-      displayManager.showOtaProgress("OTA Update", "", "OK");
-      break;
-    case HTTP_UPDATE_FAILED:
-      Serial.printf("[OTA] failed (%d): %s\n",
-                    httpUpdate.getLastError(), httpUpdate.getLastErrorString().c_str());
-      displayManager.showOtaProgress("OTA Update", "", httpUpdate.getLastErrorString().c_str());
-      delay(5000);
-      break;
-    case HTTP_UPDATE_NO_UPDATES:
-      displayManager.showOtaProgress("OTA Update", "", "No update available");
-      delay(3000);
-      break;
+  displayManager.showOtaProgress("OTA Update", tag.c_str(), "Connecting...");
+  if (!dlClient.connect(dlHost.c_str(), 443)) {
+    Serial.println("[OTA] CDN connect failed");
+    displayManager.showOtaProgress("OTA Update", "", "Connect failed");
+    otaRunning = false; delay(3000); return;
   }
+
+  // Send raw HTTP/1.1 GET
+  dlClient.print(String("GET ") + dlPath + " HTTP/1.1\r\n");
+  dlClient.print(String("Host: ") + dlHost + "\r\n");
+  dlClient.print("User-Agent: BambuTagger-AMS/" FIRMWARE_VERSION "\r\n");
+  dlClient.print("Connection: close\r\n\r\n");
+
+  // Parse response headers
+  int httpStatus = 0, contentLen = -1;
+  {
+    String line = dlClient.readStringUntil('\n');
+    line.trim();
+    if (line.length() > 9) httpStatus = line.substring(9, 12).toInt();
+    Serial.printf("[OTA] HTTP status: %d\n", httpStatus);
+    while (true) {
+      line = dlClient.readStringUntil('\n');
+      line.trim();
+      if (line.isEmpty()) break;
+      String lower = line; lower.toLowerCase();
+      if (lower.startsWith("content-length:")) {
+        String val = line.substring(15);
+        val.trim();
+        contentLen = val.toInt();
+      }
+    }
+    Serial.printf("[OTA] Content-Length: %d\n", contentLen);
+  }
+
+  if (httpStatus != 200 || contentLen <= 0) {
+    dlClient.stop();
+    displayManager.showOtaProgress("OTA Update", "", "Bad response");
+    otaRunning = false; delay(3000); return;
+  }
+
+  const esp_partition_t *part = esp_ota_get_next_update_partition(NULL);
+  esp_ota_handle_t otaHandle = 0;
+  if (esp_ota_begin(part, contentLen, &otaHandle) != ESP_OK) {
+    dlClient.stop();
+    displayManager.showOtaProgress("OTA Update", "", "OTA begin failed");
+    otaRunning = false; delay(3000); return;
+  }
+
+  uint8_t buf[2048];
+  int written = 0, lastPct = -1;
+  unsigned long lastData = millis();
+
+  while (written < contentLen) {
+    int avail = dlClient.available();
+    if (avail > 0) {
+      lastData = millis();
+      int rd = dlClient.read(buf, min(avail, (int)sizeof(buf)));
+      if (rd > 0) {
+        esp_ota_write(otaHandle, buf, rd);
+        written += rd;
+        int pct = (written * 100) / contentLen;
+        if (pct != lastPct) {
+          Serial.printf("[OTA] progress: %d / %d\n", written, contentLen);
+          displayManager.showOtaProgress("OTA Update", tag.c_str(), "Downloading...", pct);
+          lastPct = pct;
+        }
+      }
+    } else if (!dlClient.connected()) {
+      Serial.printf("[OTA] connection closed at %d/%d\n", written, contentLen);
+      break;
+    } else {
+      if (millis() - lastData > 30000) {
+        Serial.printf("[OTA] stalled at %d/%d\n", written, contentLen);
+        break;
+      }
+      delay(1);  // yield proper RTOS tick to Core-0 WiFi stack
+    }
+  }
+
+  dlClient.stop();
+  Serial.printf("[OTA] written: %d / %d\n", written, contentLen);
+
+  if (written == contentLen) {
+    esp_err_t err = esp_ota_end(otaHandle);
+    if (err == ESP_OK) err = esp_ota_set_boot_partition(part);
+    if (err == ESP_OK) {
+      displayManager.showOtaProgress("OTA Update", "", "Update OK", 100);
+      otaRunning = false;
+      delay(2000);
+      ESP.restart();
+    } else {
+      Serial.printf("[OTA] finalize error: 0x%x\n", err);
+    }
+  }
+
+  displayManager.showOtaProgress("OTA Update", "", "OTA failed");
+  otaRunning = false;
+  delay(3000);
 }
