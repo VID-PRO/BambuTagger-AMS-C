@@ -70,6 +70,7 @@ void setup() {
   displayManager.begin(cfg.deviceName);
   Serial.println(F("TFT initialized"));
   displayManager.showBootScreen();
+  displayManager.setLayout(cfg.layoutVertical);
   delay(2000);
 
   Wire.begin();

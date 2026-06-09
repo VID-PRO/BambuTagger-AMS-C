@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <Preferences.h>
 
-#define FIRMWARE_VERSION "1.1.2"
+#define FIRMWARE_VERSION "1.1.4"
 #define OTA_REPO "VID-PRO/BambuTagger-AMS-C"
 
 #define NUM_SLOTS 4
@@ -71,6 +71,7 @@ struct SystemConfig {
   bool mqttUseTLS;
   uint32_t mqttUpdateIntervalMs;
   char mqttTopicPrefix[64];
+  bool layoutVertical;
 };
 
 // --- Default Configuration ---
@@ -88,6 +89,7 @@ inline SystemConfig getDefaultConfig() {
   cfg.mqttUseTLS = false;
   cfg.mqttUpdateIntervalMs = 3000;
   strcpy(cfg.mqttTopicPrefix, "device");
+  cfg.layoutVertical = false;
   return cfg;
 }
 
@@ -107,6 +109,7 @@ inline void loadConfig(SystemConfig &cfg) {
   cfg.mqttUseTLS = prefs.getBool("mqttTLS", cfg.mqttUseTLS);
   cfg.mqttUpdateIntervalMs = prefs.getULong("mqttInt", cfg.mqttUpdateIntervalMs);
   cfg.amsUnit = prefs.getUChar("amsUnit", cfg.amsUnit);
+  cfg.layoutVertical = prefs.getBool("layoutVertical", false);  
   prefs.end();
 }
 
@@ -124,6 +127,7 @@ inline void saveConfig(const SystemConfig &cfg) {
   prefs.putBool("mqttTLS", cfg.mqttUseTLS);
   prefs.putULong("mqttInt", cfg.mqttUpdateIntervalMs);
   prefs.putUChar("amsUnit", cfg.amsUnit);
+  prefs.putBool("layoutVertical", cfg.layoutVertical);
   prefs.end();
 }
 

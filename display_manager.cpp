@@ -128,6 +128,10 @@ void DisplayManager::drawStatusBar(bool wifiConnected) {
 }
 
 void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
+  if (_verticalLayout) {
+    drawSlotGridVertical(slots);
+    return;
+  }
   display->setTextSize(2);
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
@@ -186,6 +190,10 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
 }
 
 void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
+  if (_verticalLayout) {
+    drawPrinterSlotsVertical(printer, amsUnit);
+    return;
+  }
   display->setTextSize(2);
 
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
@@ -233,6 +241,143 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
       display->print("X");
       display->setTextSize(2);
     }
+  }
+}
+
+void DisplayManager::setLayout(bool vertical) {
+  if (vertical == _verticalLayout) return;
+  _verticalLayout = vertical;
+  _dirty = true;  // force full redraw on next update()
+}
+
+void drawVerticalText(Adafruit_ST7789* display, int16_t x, int16_t y, const char* text, uint16_t color) {
+  for (size_t i = 0; text[i] != '\0'; i++) {
+    display->setCursor(x, y + (i * 8));  // Assuming textSize(1) height is 8
+    display->setTextColor(color, ST77XX_BLACK);
+    display->print(text[i]);
+  }
+}
+
+void DisplayManager::drawSlotGridVertical(const SpoolInfo slots[NUM_SLOTS]) {
+  for (uint8_t i = 0; i < NUM_SLOTS; i++) {
+    int16_t cx = (int16_t)i * 60;
+
+    // Clear column content area
+    display->fillRect(cx, 28, 60, 170, ST77XX_BLACK);
+
+    // Slot number
+    display->setTextSize(2);
+    display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
+    display->setCursor(cx + 24, 30);
+    display->print(i + 1);
+    display->drawFastHLine(cx + 2, 48, 56, 0x4228);  // dark separator
+
+    // Swatch area coordinates
+    const int16_t sx = cx + 4, sy = 50, sw = 52, sh = 100;
+
+    if (slots[i].present && slots[i].tagReadSuccess) {
+      // Large colour swatch
+      if (slots[i].colorHex[0] && strlen(slots[i].colorHex) >= 6) {
+        display->fillRect(sx, sy, sw, sh, hexToRgb565(slots[i].colorHex));
+        display->drawRect(sx, sy, sw, sh, ST77XX_WHITE);
+      } else {
+        display->drawRect(sx, sy, sw, sh, 0x6B4D);
+      }
+
+      // Material — drawn vertically inside the color swatch
+      display->setTextSize(1);
+      char mat[10];
+      strncpy(mat, slots[i].materialType, 9);
+      mat[9] = '\0';
+
+      int16_t textX = sx + (sw / 2) - 3;  // Center horizontally within swatch
+      int16_t textY = sy + 10;            // Start near top of swatch
+
+      display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      for (size_t c = 0; c < strlen(mat); c++) {
+        display->setCursor(textX, textY + (c * 8));  // 8px standard char height
+        display->print(mat[c]);
+      }
+
+      // Percentage bar + label
+      if (slots[i].totalGrams > 0) {
+        uint8_t pct = (uint8_t)((uint32_t)slots[i].remainingGrams * 100 / slots[i].totalGrams);
+        uint16_t pctColor = (pct > 50) ? ST77XX_GREEN : (pct > 20) ? ST77XX_YELLOW
+                                                                   : ST77XX_RED;
+        display->drawRect(sx, 166, sw, 8, ST77XX_WHITE);
+        if (pct > 0) display->fillRect(sx + 1, 167, (sw - 2) * pct / 100, 6, pctColor);
+        char pctStr[6];
+        snprintf(pctStr, sizeof(pctStr), "%d%%", pct);
+        display->setTextColor(pctColor, ST77XX_BLACK);
+        display->setCursor(cx + (60 - (int16_t)strlen(pctStr) * 6) / 2, 178);
+        display->print(pctStr);
+      }
+    } else if (slots[i].present) {
+      display->drawRect(sx, sy, sw, sh, ST77XX_YELLOW);
+      display->setTextSize(1);
+      display->setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
+      display->setCursor(cx + 7, sy + 44);
+      display->print("reading");
+    } else {
+      display->drawRect(sx, sy, sw, sh, 0x6B4D);
+      display->setTextColor(0x6B4D, ST77XX_BLACK);
+      display->setTextSize(3);
+      display->setCursor(cx + 21, sy + 38);
+      display->print("X");
+    }
+
+    display->setTextSize(2);
+  }
+}
+
+void DisplayManager::drawPrinterSlotsVertical(BambuPrinter* printer, uint8_t amsUnit) {
+  for (uint8_t i = 0; i < NUM_SLOTS; i++) {
+    int16_t cx = (int16_t)i * 60;
+
+    display->fillRect(cx, 28, 60, 170, ST77XX_BLACK);
+
+    display->setTextSize(2);
+    display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
+    display->setCursor(cx + 24, 30);
+    display->print(i + 1);
+    display->drawFastHLine(cx + 2, 48, 56, 0x4228);
+
+    const int16_t sx = cx + 4, sy = 50, sw = 52, sh = 100;
+
+    const char* ttype = printer->getAmsTrayType(amsUnit, i);
+    const char* col = printer->getAmsTrayColor(amsUnit, i);
+
+    if (ttype && ttype[0]) {
+      if (col && strlen(col) >= 6) {
+        display->fillRect(sx, sy, sw, sh, hexToRgb565(col));
+        display->drawRect(sx, sy, sw, sh, ST77XX_WHITE);
+      } else {
+        display->drawRect(sx, sy, sw, sh, 0x6B4D);
+      }
+
+      // Material — drawn vertically inside the color swatch
+      display->setTextSize(2);
+      char mat[6];
+      strncpy(mat, ttype, 5);
+      mat[6] = '\0';
+
+      int16_t textX = sx + (sw / 2) - 5;
+      int16_t textY = sy + 10;
+
+      display->setTextColor(ST77XX_WHITE, ST77XX_BLACK);
+      for (size_t c = 0; c < strlen(mat); c++) {
+        display->setCursor(textX, textY + (c * 18));
+        display->print(mat[c]);
+      }
+    } else {
+      display->drawRect(sx, sy, sw, sh, 0x6B4D);
+      display->setTextColor(0x6B4D, ST77XX_BLACK);
+      display->setTextSize(3);
+      display->setCursor(cx + 21, sy + 38);
+      display->print("X");
+    }
+
+    display->setTextSize(2);
   }
 }
 

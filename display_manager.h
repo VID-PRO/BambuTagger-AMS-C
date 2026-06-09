@@ -24,12 +24,16 @@ public:
   void showOtaProgress(const char* line1, const char* line2 = nullptr,
                        const char* line3 = nullptr, int pct = -1);
   void showBootScreen();
+  void setLayout(bool vertical);
+
 
 private:
   void drawStatusBar(bool wifiConnected);
   void drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]);
   void drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit);
   void drawFooter(bool mqttConnected, bool printerOnline, float temp = -99, float humidity = -1);
+  void drawSlotGridVertical(const SpoolInfo slots[NUM_SLOTS]);
+  void drawPrinterSlotsVertical(BambuPrinter* printer, uint8_t amsUnit);
 
   Adafruit_ST7789* display;
   SPIClass *hspi = NULL;
@@ -46,6 +50,7 @@ private:
   char _lastTrayColor[NUM_SLOTS][9];
   bool _dirty = true;
   int _lastOtaPct = -1;
+  bool _verticalLayout = false;
 };
 
 #endif

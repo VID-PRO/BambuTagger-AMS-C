@@ -151,6 +151,15 @@ border-top-color:#58a6ff;border-radius:50%;animation:spin .8s linear infinite}
 </div>
 </div>
 </div>
+<div class="card">
+<h2>Slot Grid Orientation</h2>
+<div class="row">
+<div class="col">
+  <label>Slot Grid Orientation:</label>
+  <button class="btn btn-primary" onclick="toggleLayout()">Toggle</button>
+</div>
+</div>
+</div>
 
 <script>
   const slider = document.getElementById('brightnessSlider');
@@ -400,6 +409,20 @@ document.getElementById('mqttEnabled').checked=c.mqttEnabled||false;
 document.getElementById('mqttUseTLS').checked=c.mqttUseTLS||false;
 document.getElementById('mqttInterval').value=c.mqttUpdateIntervalMs||3000;
 document.getElementById('amsUnit').value=c.amsUnit||0})}
+
+function toggleLayout() {
+    fetch('/api/config').then(r => r.json()).then(cfg => {
+        let newLayout = !cfg.layoutVertical;
+        fetch('/api/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({layoutVertical: newLayout})
+        }).then(() => {
+            showToast('Layout updated', true);
+            // Optional: update UI button state
+        }).catch(() => showToast('Failed to update layout', false));
+    });
+}
 
 loadConfig();
 fetchStatus();

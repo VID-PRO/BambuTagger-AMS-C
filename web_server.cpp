@@ -183,6 +183,7 @@ void WebInterface::handleConfigGet() {
   doc["mqttUpdateIntervalMs"] = config->mqttUpdateIntervalMs;
   doc["mqttUseTLS"] = config->mqttUseTLS;
   doc["amsUnit"] = config->amsUnit;
+  doc["layoutVertical"] = config->layoutVertical;
   sendJsonResponse(doc);
 }
 
@@ -250,6 +251,10 @@ void WebInterface::handleConfigPost() {
   if (postDoc.containsKey("amsUnit")) {
     config->amsUnit = postDoc["amsUnit"] | config->amsUnit;
     if (config->amsUnit > 3) config->amsUnit = 0;
+    changed = true;
+  }
+  if (postDoc.containsKey("layoutVertical")) {
+    config->layoutVertical = !config->layoutVertical;
     changed = true;
   }
 
