@@ -46,9 +46,9 @@ background:#30363d;border-radius:24px;transition:.3s}
 background:#c9d1d9;border-radius:50%;transition:.3s}
 input:checked+.slider{background:#238636}
 input:checked+.slider:before{transform:translateX(20px)}
-.slot-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-@media(max-width:600px){.slot-grid{grid-template-columns:1fr}}
-.slot{border:1px solid #30363d;border-radius:6px;padding:12px}
+.slot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+@media(max-width:600px){.slot-grid{grid-template-columns:repeat(2,1fr)}}
+.slot{border:1px solid #30363d;border-radius:6px;padding:12px;display:flex;flex-direction:column}
 .slot-title{font-weight:bold;margin-bottom:8px;font-size:14px}
 .slot-title .led{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
 .led-green{background:#3fb950}
@@ -237,29 +237,26 @@ for(var i=0;i<data.slots.length;i++){ var s=data.slots[i]; if(s.present) tagBySl
 for(var i=0;i<ps.length;i++){
 var p=ps[i];
 var t=tagBySlot[i];
-var hasSpool=p.hasSpool;
 var showColor=t&&t.colorHex?t.colorHex.substring(0,6):(p.hasSpool&&p.color?p.color.substring(0,6):null);
+var ledCls=p.hasSpool?'led-green':(t?'led-yellow':'led-off');
 h+='<div class="slot">';
-h+='<div class="slot-title"><span class="led '+(p.hasSpool?'led-green':'led-yellow')+'"></span>Slot '+(i+1)+' <button class="btn btn-secondary" style="font-size:10px;padding:2px 6px;margin-left:8px" onclick="readAmsSlot('+i+')">Read</button></div>';
-h+='<div style="display:flex;align-items:center;gap:8px">';
-h+='<div class="slot-detail" style="flex:1">';
+h+='<div class="slot-title"><span class="led '+ledCls+'"></span>Slot '+(i+1)+'</div>';
+h+='<div style="height:64px;border-radius:4px;margin:8px 0;border:1px solid #484f58;background:'+(showColor?'#'+showColor:'#1c2128')+'"></div>';
+h+='<div class="slot-detail">';
 if(p.hasSpool){
-h+='Type: '+p.trayType+'<br>';
-var sub = (t&&t.detailedType&&t.detailedType.length>0)?t.detailedType:p.trayType;
-h+='Sub: '+sub+'<br>';
-h+='Material: '+p.material+'<br>';
-h+='Color: '+p.color;
-}else{h+='AMS: empty'}
+  h+='<span style="color:#c9d1d9;font-weight:bold">'+p.trayType+'</span>';
+  if(p.material&&p.material.length>0)h+='<br><span style="color:#8b949e">'+p.material+'</span>';
+  if(showColor)h+='<br>#'+showColor;
+}else{h+='<span style="color:#8b949e">AMS: empty</span>'}
 if(t){
-h+='<br><span style="color:#58a6ff">Tag: ';
-if(t.detailedType&&t.detailedType.length>0)h+=t.detailedType+' - ';
-h+=t.materialType+'</span>';
-h+=' &middot; '+t.colorHex;
-if(t.totalGrams>0)h+=' &middot; '+t.remainingGrams+'g/'+t.totalGrams+'g';
+  h+='<br><span style="color:#58a6ff;font-size:11px">';
+  h+=(t.detailedType&&t.detailedType.length>0)?t.detailedType:t.materialType;
+  h+='</span>';
+  if(t.totalGrams>0)h+='<br><span style="font-size:11px">'+t.remainingGrams+'g / '+t.totalGrams+'g</span>';
 }
 h+='</div>';
-if(showColor)h+='<div style="width:36px;height:36px;border-radius:4px;background:#'+showColor+';flex-shrink:0;border:1px solid #484f58"></div>';
-h+='</div></div>'}
+h+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 6px;margin-top:auto;padding-top:8px;width:100%" onclick="readAmsSlot('+i+')">Read</button>';
+h+='</div>'}
 g.innerHTML=h;
 document.getElementById('wifiStatus').textContent='WiFi: '+(data.wifiConnected?'Connected':'Disconnected');
 document.getElementById('wifiDot').className='status-dot '+(data.wifiConnected?'led-green':'led-red');
