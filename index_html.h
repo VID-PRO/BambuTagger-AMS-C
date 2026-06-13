@@ -247,24 +247,12 @@ if(p.hasSpool){
   h+='<span style="color:#c9d1d9;font-weight:bold">'+p.trayType+'</span>';
   if(p.material&&p.material.length>0)h+='<br><span style="color:#8b949e">'+p.material+'</span>';
   if(showColor)h+='<br>#'+showColor;
-}else{h+='<span style="color:#8b949e">empty</span>'}
+}else{h+='<span style="color:#8b949e">AMS: empty</span>'}
 if(t){
   h+='<br><span style="color:#58a6ff;font-size:11px">';
   h+=(t.detailedType&&t.detailedType.length>0)?t.detailedType:t.materialType;
   h+='</span>';
-  if(t.remainingGrams>0||t.totalGrams>0){
-  var wLine='';
-  if(t.totalGrams>0&&t.remainingGrams>0){
-    var wpct=Math.round(t.remainingGrams*100/t.totalGrams);
-    var wclr=wpct>50?'#3fb950':wpct>20?'#d29922':'#da3633';
-    wLine=t.remainingGrams+'g / '+t.totalGrams+'g <b style="color:'+wclr+'">'+wpct+'%</b>';
-  }else if(t.totalGrams>0){
-    wLine=t.totalGrams+'g (full)';
-  }else{
-    wLine=t.remainingGrams+'g';
-  }
-  h+='<br><span style="font-size:11px">'+wLine+'</span>';
-}
+  if(t.totalGrams>0)h+='<br><span style="font-size:11px">'+t.remainingGrams+'g / '+t.totalGrams+'g</span>';
 }
 h+='</div>';
 h+='<button class="btn btn-secondary" style="font-size:10px;padding:3px 6px;margin-top:auto;padding-top:8px;width:100%" onclick="readAmsSlot('+i+')">Read</button>';

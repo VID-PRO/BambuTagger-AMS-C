@@ -139,6 +139,7 @@ void WebInterface::handleStatus() {
       ps["trayType"] = ttype;
       ps["material"] = bambuPrinter->getAmsTrayMaterial(amsUnit, t);
       ps["color"] = bambuPrinter->getAmsTrayColor(amsUnit, t);
+      ps["remain"] = bambuPrinter->getAmsTrayRemain(amsUnit, t);   // 0-100 %
       ps["hasSpool"] = (ttype && ttype[0] != '\0');
       ps["amsConnected"] = amsConnected;
     }

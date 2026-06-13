@@ -68,6 +68,7 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
     _lastPrinterMode = !printerMode;            // invalidate mode cache → forces redraw
     memset(_lastTrayType, 0, sizeof(_lastTrayType));
     memset(_lastTrayColor, 0, sizeof(_lastTrayColor));
+    memset(_lastTrayRemain, 0xFF, sizeof(_lastTrayRemain));  // 0xFF = "unknown" → forces redraw
     tempOld = -999;
     humidityOld = -999;  // invalidate footer cache
     mqttConnectedOld = !mqttConnected;
@@ -79,8 +80,10 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
     for (uint8_t i = 0; i < NUM_SLOTS && !changed; i++) {
       const char* t = printer->getAmsTrayType(amsUnit, i);
       const char* c = printer->getAmsTrayColor(amsUnit, i);
+      uint8_t rem = printer->getAmsTrayRemain(amsUnit, i);
       if (strcmp(t ? t : "", _lastTrayType[i]) != 0) changed = true;
       if (strcmp(c ? c : "", _lastTrayColor[i]) != 0) changed = true;
+      if (rem != _lastTrayRemain[i]) changed = true;
     }
     if (changed) {
       drawPrinterSlots(printer, amsUnit);
@@ -91,6 +94,7 @@ void DisplayManager::update(const SpoolInfo slots[NUM_SLOTS], bool wifiConnected
         _lastTrayType[i][15] = '\0';
         strncpy(_lastTrayColor[i], c ? c : "", 8);
         _lastTrayColor[i][8] = '\0';
+        _lastTrayRemain[i] = printer->getAmsTrayRemain(amsUnit, i);
       }
     }
   } else {
@@ -138,8 +142,8 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
     uint8_t y = 30 + (i * 42);
     display->fillRect(4, y + 20, 14, 14, ST77XX_BLACK);
     display->fillRect(205, y, 30, 30, ST77XX_BLACK);
-    display->fillRect(32, y, SCREEN_WIDTH - 32, 16, ST77XX_BLACK);
-    display->fillRect(24, y + 20, SCREEN_WIDTH - 24, 16, ST77XX_BLACK);
+    display->fillRect(32, y, 170, 16, ST77XX_BLACK);
+    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK);
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -153,20 +157,6 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
       display->setCursor(32, y);
       display->print(matShort);
 
-      // Weight right-aligned on material row
-      {
-        char wStr[12];
-        if (slots[i].totalGrams > 0 && slots[i].remainingGrams > 0)
-          snprintf(wStr, sizeof(wStr), "%dg", slots[i].remainingGrams);
-        else if (slots[i].remainingGrams > 0)
-          snprintf(wStr, sizeof(wStr), "%dg", slots[i].remainingGrams);
-        else
-          strcpy(wStr, "--g");
-        display->setTextColor(ST77XX_CYAN, ST77XX_BLACK);
-        display->setCursor(SCREEN_WIDTH - (int16_t)(strlen(wStr) * 12), y);
-        display->print(wStr);
-      }
-
       if (slots[i].colorHex[0] && strlen(slots[i].colorHex) >= 6) {
         uint16_t swatchColor = hexToRgb565(slots[i].colorHex);
         display->fillRect(4, y + 20, 14, 14, swatchColor);
@@ -178,17 +168,13 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
         display->print(slots[i].colorHex);
       }
 
-      if (slots[i].totalGrams > 0 && slots[i].remainingGrams > 0) {
-        uint8_t pct = (uint8_t)((uint32_t)slots[i].remainingGrams * 100 / slots[i].totalGrams);
+      if (slots[i].totalGrams > 0) {
+        uint8_t pct = (uint16_t)((uint32_t)slots[i].remainingGrams * 100 / slots[i].totalGrams);
         uint16_t pctColor = (pct > 50) ? ST77XX_GREEN : (pct > 20) ? ST77XX_YELLOW
                                                                    : ST77XX_RED;
         display->setTextColor(pctColor, ST77XX_BLACK);
         display->setCursor(SCREEN_WIDTH - 48, y + 20);
         display->printf("%3d%%", pct);
-      } else if (slots[i].totalGrams > 0) {
-        display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
-        display->setCursor(SCREEN_WIDTH - 48, y + 20);
-        display->printf("100%%");
       }
     } else if (slots[i].present) {
       display->setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
@@ -218,8 +204,8 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
     uint8_t y = 30 + (i * 42);
     display->fillRect(4, y + 20, 14, 14, ST77XX_BLACK);
     display->fillRect(205, y, 30, 30, ST77XX_BLACK);
-    display->fillRect(32, y, SCREEN_WIDTH - 32, 16, ST77XX_BLACK);
-    display->fillRect(24, y + 20, SCREEN_WIDTH - 24, 16, ST77XX_BLACK);
+    display->fillRect(32, y, 170, 16, ST77XX_BLACK);
+    display->fillRect(24, y + 20, 192, 16, ST77XX_BLACK);  // wider clear to cover pct area
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -249,6 +235,14 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
         display->print("#");
         display->print(col6);
       }
+
+      // Remaining filament % from printer
+      uint8_t rem = printer->getAmsTrayRemain(amsUnit, i);
+      uint16_t remColor = (rem > 50) ? ST77XX_GREEN : (rem > 20) ? ST77XX_YELLOW : ST77XX_RED;
+      display->setTextColor(remColor, ST77XX_BLACK);
+      display->setCursor(SCREEN_WIDTH - 48, y + 20);
+      display->printf("%3d%%", rem);
+
     } else {
       display->setTextColor(0x6B4D, ST77XX_BLACK);
       display->setCursor(32, y);
@@ -387,6 +381,18 @@ void DisplayManager::drawPrinterSlotsVertical(BambuPrinter* printer, uint8_t ams
         display->setCursor(textX, textY + (c * 18));
         display->print(mat[c]);
       }
+
+      // Remaining filament % bar + label from printer
+      uint8_t rem = printer->getAmsTrayRemain(amsUnit, i);
+      uint16_t remColor = (rem > 50) ? ST77XX_GREEN : (rem > 20) ? ST77XX_YELLOW : ST77XX_RED;
+      display->drawRect(sx, 166, sw, 8, ST77XX_WHITE);
+      if (rem > 0) display->fillRect(sx + 1, 167, (sw - 2) * rem / 100, 6, remColor);
+      char remStr[6];
+      snprintf(remStr, sizeof(remStr), "%d%%", rem);
+      display->setTextColor(remColor, ST77XX_BLACK);
+      display->setCursor(cx + (60 - (int16_t)strlen(remStr) * 6) / 2, 178);
+      display->print(remStr);
+
     } else {
       display->drawRect(sx, sy, sw, sh, 0x6B4D);
       display->setTextColor(0x6B4D, ST77XX_BLACK);

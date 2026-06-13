@@ -48,6 +48,7 @@ private:
   bool _lastPrinterMode = false;
   char _lastTrayType[NUM_SLOTS][16];
   char _lastTrayColor[NUM_SLOTS][9];
+  uint8_t _lastTrayRemain[NUM_SLOTS];   // cache for dirty-check
   bool _dirty = true;
   int _lastOtaPct = -1;
   bool _verticalLayout = false;

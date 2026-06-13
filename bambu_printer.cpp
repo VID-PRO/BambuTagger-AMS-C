@@ -18,6 +18,7 @@ void BambuPrinter::begin(const SystemConfig &cfg) {
     for (uint8_t t = 0; t < 4; t++) {
       detectedAms[i].trays[t][0] = '\0';
       detectedAms[i].trayColors[t][0] = '\0';
+      detectedAms[i].trayRemain[t] = 0;
     }
   }
 
@@ -254,12 +255,20 @@ void BambuPrinter::parseReport(JsonDocument &doc) {
                 if (col) strncpy(detectedAms[id].trayColors[tid], col, 8);
                 const char* ttype = t["tray_type"] | "";
                 if (ttype) strncpy(detectedAms[id].trayTypes[tid], ttype, 15);
+                // remain: reported as 0-100 integer by the printer
+                JsonVariant rem = t["remain"];
+                if (!rem.isNull()) {
+                  int remVal = rem.as<int>();
+                  if (remVal < 0) remVal = 0;
+                  if (remVal > 100) remVal = 100;
+                  detectedAms[id].trayRemain[tid] = (uint8_t)remVal;
+                }
           }
         }
         if (id < MAX_DETECTED_AMS) {
-          // Serial.printf("AMS%d: tray[0]=%s/%s color=%s\n", id,
+          // Serial.printf("AMS%d: tray[0]=%s/%s color=%s remain=%d%%\n", id,
           //               detectedAms[id].trayTypes[0], detectedAms[id].trays[0],
-          //               detectedAms[id].trayColors[0]);
+          //               detectedAms[id].trayColors[0], detectedAms[id].trayRemain[0]);
         }
       }
     }
@@ -343,6 +352,11 @@ const char* BambuPrinter::getAmsTrayType(uint8_t amsId, uint8_t trayId) const {
 const char* BambuPrinter::getAmsTrayColor(uint8_t amsId, uint8_t trayId) const {
   if (amsId >= MAX_DETECTED_AMS || trayId >= 4) return "";
   return detectedAms[amsId].trayColors[trayId];
+}
+
+uint8_t BambuPrinter::getAmsTrayRemain(uint8_t amsId, uint8_t trayId) const {
+  if (amsId >= MAX_DETECTED_AMS || trayId >= 4) return 0;
+  return detectedAms[amsId].trayRemain[trayId];
 }
 
 const char* BambuPrinter::getAmsFwVer(uint8_t amsId) const {

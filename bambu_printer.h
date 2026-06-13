@@ -20,6 +20,7 @@ struct AmsInfo {
   char trays[4][32];
   char trayTypes[4][16];
   char trayColors[4][9];
+  uint8_t trayRemain[4];   // remaining filament 0-100 % from printer
   float temperature;
   float humidity;
 };
@@ -48,6 +49,7 @@ public:
   const char* getAmsTrayMaterial(uint8_t amsId, uint8_t trayId) const;
   const char* getAmsTrayType(uint8_t amsId, uint8_t trayId) const;
   const char* getAmsTrayColor(uint8_t amsId, uint8_t trayId) const;
+  uint8_t getAmsTrayRemain(uint8_t amsId, uint8_t trayId) const;  // 0-100 %
   const char* getAmsFwVer(uint8_t amsId) const;
   const char* getAmsProductName(uint8_t amsId) const;
   const char* getAmsSerial(uint8_t amsId) const;
