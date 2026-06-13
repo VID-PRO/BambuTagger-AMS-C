@@ -138,8 +138,8 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
     uint8_t y = 30 + (i * 42);
     display->fillRect(4, y + 20, 14, 14, ST77XX_BLACK);
     display->fillRect(205, y, 30, 30, ST77XX_BLACK);
-    display->fillRect(32, y, 170, 16, ST77XX_BLACK);
-    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK);
+    display->fillRect(32, y, SCREEN_WIDTH - 32, 16, ST77XX_BLACK);
+    display->fillRect(24, y + 20, SCREEN_WIDTH - 24, 16, ST77XX_BLACK);
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
@@ -153,6 +153,20 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
       display->setCursor(32, y);
       display->print(matShort);
 
+      // Weight right-aligned on material row
+      {
+        char wStr[12];
+        if (slots[i].totalGrams > 0 && slots[i].remainingGrams > 0)
+          snprintf(wStr, sizeof(wStr), "%dg", slots[i].remainingGrams);
+        else if (slots[i].remainingGrams > 0)
+          snprintf(wStr, sizeof(wStr), "%dg", slots[i].remainingGrams);
+        else
+          strcpy(wStr, "--g");
+        display->setTextColor(ST77XX_CYAN, ST77XX_BLACK);
+        display->setCursor(SCREEN_WIDTH - (int16_t)(strlen(wStr) * 12), y);
+        display->print(wStr);
+      }
+
       if (slots[i].colorHex[0] && strlen(slots[i].colorHex) >= 6) {
         uint16_t swatchColor = hexToRgb565(slots[i].colorHex);
         display->fillRect(4, y + 20, 14, 14, swatchColor);
@@ -164,13 +178,17 @@ void DisplayManager::drawSlotGrid(const SpoolInfo slots[NUM_SLOTS]) {
         display->print(slots[i].colorHex);
       }
 
-      if (slots[i].totalGrams > 0) {
-        uint8_t pct = (uint16_t)((uint32_t)slots[i].remainingGrams * 100 / slots[i].totalGrams);
+      if (slots[i].totalGrams > 0 && slots[i].remainingGrams > 0) {
+        uint8_t pct = (uint8_t)((uint32_t)slots[i].remainingGrams * 100 / slots[i].totalGrams);
         uint16_t pctColor = (pct > 50) ? ST77XX_GREEN : (pct > 20) ? ST77XX_YELLOW
                                                                    : ST77XX_RED;
         display->setTextColor(pctColor, ST77XX_BLACK);
         display->setCursor(SCREEN_WIDTH - 48, y + 20);
         display->printf("%3d%%", pct);
+      } else if (slots[i].totalGrams > 0) {
+        display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
+        display->setCursor(SCREEN_WIDTH - 48, y + 20);
+        display->printf("100%%");
       }
     } else if (slots[i].present) {
       display->setTextColor(ST77XX_YELLOW, ST77XX_BLACK);
@@ -200,8 +218,8 @@ void DisplayManager::drawPrinterSlots(BambuPrinter* printer, uint8_t amsUnit) {
     uint8_t y = 30 + (i * 42);
     display->fillRect(4, y + 20, 14, 14, ST77XX_BLACK);
     display->fillRect(205, y, 30, 30, ST77XX_BLACK);
-    display->fillRect(32, y, 170, 16, ST77XX_BLACK);
-    display->fillRect(24, y + 20, 175, 16, ST77XX_BLACK);
+    display->fillRect(32, y, SCREEN_WIDTH - 32, 16, ST77XX_BLACK);
+    display->fillRect(24, y + 20, SCREEN_WIDTH - 24, 16, ST77XX_BLACK);
 
     display->setTextColor(ST77XX_GREEN, ST77XX_BLACK);
     display->setCursor(4, y);
