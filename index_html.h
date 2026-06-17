@@ -247,6 +247,7 @@ if(p.hasSpool){
   h+='<span style="color:#c9d1d9;font-weight:bold">'+p.trayType+'</span>';
   if(p.material&&p.material.length>0)h+='<br><span style="color:#8b949e">'+p.material+'</span>';
   if(showColor)h+='<br>#'+showColor;
+  var rPct=(p.remain>0)?p.remain:(t&&t.totalGrams>0?Math.round(t.remainingGrams/t.totalGrams*100):-1);if(rPct>0){h+='<br><span style="font-size:11px;color:#8b949e">'+rPct+'% remain</span>';}else{h+='<br><span style="font-size:11px;color:#8b949e">unknown</span>';}
 }else{h+='<span style="color:#8b949e">AMS: empty</span>'}
 if(t){
   h+='<br><span style="color:#58a6ff;font-size:11px">';
@@ -296,6 +297,7 @@ var st=tagBySlot[t];
 if(st&&st.detailedType&&st.detailedType.length>0)printerHtml+=' <span style="color:#58a6ff;font-size:10px">('+st.detailedType+')</span>';
 printerHtml+='</span>';
 if(hasSpool&&tr.color){printerHtml+='<span style="width:24px;height:24px;border-radius:4px;background:#'+tr.color.substring(0,6)+';flex-shrink:0;border:1px solid #484f58"></span>'}
+if(hasSpool&&typeof tr.remain!=='undefined'){var rPct=(tr.remain>0)?tr.remain:(tr.remainingGrams>0&&tr.totalGrams>0?Math.round(tr.remainingGrams/tr.totalGrams*100):-1);if(rPct>0){printerHtml+='<span style="font-size:10px;color:#8b949e;flex-shrink:0">'+rPct+'%'+(tr.remainingGrams>0?' ('+tr.remainingGrams+'g)':'')+'</span>';}else{printerHtml+='<span style="font-size:10px;color:#8b949e;flex-shrink:0">unknown</span>';}}
 printerHtml+='</div>'}
 printerHtml+='</div></div>'}
 document.getElementById('printerAmsCards').innerHTML=printerHtml||'<span style="color:#8b949e">No AMS data — click Sync From Printer</span>';
@@ -316,7 +318,7 @@ document.getElementById('amsUnit').value=ams.units.find(function(u){return u.con
 }}
 
 function fetchStatus(){fetch('/api/status').then(function(r){return r.json()}).then(updateSlots)
-.catch(function(){console.log('Status fetch failed')})}
+.catch(function(){})}
 
 function scanAll(){fetch('/api/scan',{method:'POST'}).then(function(r){return r.json()})
 .then(function(d){showToast('Scan triggered',true);fetchStatus()})

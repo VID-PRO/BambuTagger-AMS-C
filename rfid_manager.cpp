@@ -62,7 +62,7 @@ void RfidManager::begin() {
   SPI.begin(SPI_SCK, SPI_MISO, SPI_MOSI);
   SPI.setFrequency(1000000);
 
-  Serial.println(F("RFID init:"));
+//  Serial.println(F("RFID init:"));
   for (uint8_t i = 0; i < NUM_SLOTS; i++) {
     rfidSPI[i] = new MFRC522_SPI(SS_PINS[i], RST_PINS[i], &SPI, SPISettings(1000000, MSBFIRST, SPI_MODE0));
     mfrc522[i] = new MFRC522(rfidSPI[i]);
@@ -70,9 +70,9 @@ void RfidManager::begin() {
 
     byte ver = mfrc522[i]->PCD_ReadRegister(MFRC522::VersionReg);
     readerOk[i] = (ver == 0x92 || ver == 0x91 || ver == 0xB2);
-    Serial.printf("  Slot %d SS=%d RST=%d ver=0x%02X %s\n", i,
-                  SS_PINS[i], RST_PINS[i], ver,
-                  readerOk[i] ? "OK" : "FAIL");
+//    Serial.printf("  Slot %d SS=%d RST=%d ver=0x%02X %s\n", i,
+//                  SS_PINS[i], RST_PINS[i], ver,
+//                  readerOk[i] ? "OK" : "FAIL");
 
     TagParser::clear(spoolData[i]);
     lastPoll[i] = 0;
@@ -154,7 +154,7 @@ bool RfidManager::readNtag(uint8_t slot, SpoolInfo &info) {
     // NTAG/Ultralight fallback — try reading without auth
     success = readNtagPages(slot, info);
   } else {
-    Serial.printf("Slot %d: unsupported tag type\n", slot);
+//    Serial.printf("Slot %d: unsupported tag type\n", slot);
   }
 
   strncpy(info.uid, uidStr, sizeof(info.uid) - 1);
@@ -240,7 +240,7 @@ authOk2:
 
   reader->PCD_StopCrypto1();
 
-  Serial.printf("Slot %d: MIFARE auth done, bytesRead=%d\n", slot, bytesRead);
+//  Serial.printf("Slot %d: MIFARE auth done, bytesRead=%d\n", slot, bytesRead);
 
   // Parse using Touch fixed-block offsets (Bambu Lab RFID Tag Guide)
   info.tagReadSuccess = false;
@@ -290,10 +290,10 @@ authOk2:
   bool result = info.tagReadSuccess;
 
   if (result) {
-    Serial.printf("Slot %d: idx=%s type=%s color=%s weight=%d\n", slot,
-                   info.materialType, info.detailedType, info.colorHex, info.totalGrams);
+//    Serial.printf("Slot %d: idx=%s type=%s color=%s weight=%d\n", slot,
+//                   info.materialType, info.detailedType, info.colorHex, info.totalGrams);
   } else {
-    Serial.printf("Slot %d: parse FAIL (bytesRead=%d)\n", slot, bytesRead);
+//    Serial.printf("Slot %d: parse FAIL (bytesRead=%d)\n", slot, bytesRead);
   }
 
   delete[] dataBuffer;
@@ -322,7 +322,7 @@ bool RfidManager::readNtagPages(uint8_t slot, SpoolInfo &info) {
     }
   }
 
-  Serial.printf("Slot %d: NTAG read, bytesRead=%d\n", slot, bytesRead);
+//  Serial.printf("Slot %d: NTAG read, bytesRead=%d\n", slot, bytesRead);
 
   bool result = TagParser::parse(dataBuffer, bytesRead, info.uid, info);
   if (result) {

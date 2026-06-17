@@ -100,9 +100,14 @@ void WebInterface::handleStatus() {
         tray["material"] = bambuPrinter->getAmsTrayMaterial(a, t);
         tray["trayType"] = bambuPrinter->getAmsTrayType(a, t);
         tray["color"] = bambuPrinter->getAmsTrayColor(a, t);
+        tray["remain"] = bambuPrinter->getAmsTrayRemain(a, t);
         SpoolInfo tagInfo;
         if (rfidManager->getSpoolInfo(t, tagInfo) && tagInfo.present) {
           tray["sub"] = tagInfo.detailedType;
+          if (a == config->amsUnit) {
+            tray["remainingGrams"] = tagInfo.remainingGrams;
+            tray["totalGrams"]     = tagInfo.totalGrams;
+          }
         }
       }
     }
@@ -142,6 +147,11 @@ void WebInterface::handleStatus() {
       ps["remain"] = bambuPrinter->getAmsTrayRemain(amsUnit, t);   // 0-100 %
       ps["hasSpool"] = (ttype && ttype[0] != '\0');
       ps["amsConnected"] = amsConnected;
+      SpoolInfo psInfo;
+      if (rfidManager->getSpoolInfo(t, psInfo) && psInfo.present) {
+        ps["remainingGrams"] = psInfo.remainingGrams;
+        ps["totalGrams"]     = psInfo.totalGrams;
+      }
     }
   }
 

@@ -213,7 +213,7 @@ void BambuPrinter::mqttCallback(char* topic, byte* payload, unsigned int length)
   DynamicJsonDocument doc(MQTT_BUFFER_SIZE);
   DeserializationError err = deserializeJson(doc, payload, length);
   if (err) {
-    Serial.printf("JSON deser error: %s\n", err.c_str());
+//    Serial.printf("JSON deser error: %s\n", err.c_str());
     return;
   }
 
