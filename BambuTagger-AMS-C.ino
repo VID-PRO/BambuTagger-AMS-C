@@ -224,6 +224,7 @@ void connectWiFi() {
   Serial.print(F("Connecting to WiFi: "));
   Serial.println(cfg.wifiSSID);
 
+  WiFi.setHostname(cfg.deviceName);
   WiFi.mode(WIFI_STA);
   WiFi.begin(cfg.wifiSSID, cfg.wifiPassword);
 
