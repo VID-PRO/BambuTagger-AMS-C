@@ -1,6 +1,6 @@
 # ============================================================
-#  BambuTagger-AMS-C — Automatic Build & Release
-#  Compiles the ESP32 sketch and publishes a GitHub Release
+#  BambuTagger-AMS-C — Automatic Build & Release (PlatformIO)
+#  Compiles the ESP32 firmware and publishes a GitHub Release
 #  every time a version tag (v*) is pushed.
 #  A normal push to main only compiles (smoke-test, no release).
 # ============================================================
@@ -28,66 +28,46 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up arduino-cli
-        uses: arduino/setup-arduino-cli@v2
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
-      - name: Cache Arduino data
+      - name: Cache PlatformIO packages
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.arduino15
-            ~/Arduino/libraries
-          key: arduino-esp32-${{ runner.os }}-${{ hashFiles('GHActions/release.yml') }}
-          restore-keys: arduino-esp32-${{ runner.os }}-
+          path: ~/.platformio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
 
-      - name: Install ESP32 platform
-        run: |
-          arduino-cli config init --overwrite
-          arduino-cli config add board_manager.additional_urls \
-            https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
-          arduino-cli core update-index
-          arduino-cli core install esp32:esp32@3.0.7
+      - name: Install PlatformIO
+        run: pip install platformio esptool
 
-      - name: Install libraries
-        run: |
-          arduino-cli lib install "MFRC522-spi-i2c-uart-async"
-          arduino-cli lib install "Adafruit NeoPixel"
-          arduino-cli lib install "Adafruit GFX Library"
-          arduino-cli lib install "Adafruit ST7735 and ST7789 Library"
-          arduino-cli lib install "PubSubClient"
-          arduino-cli lib install "ArduinoJson"
-          arduino-cli lib install "Adafruit BME280 Library"
+      - name: Build firmware
+        run: pio run
 
-      - name: Compile sketch
+      - name: Prepare build artifacts
         run: |
-          arduino-cli compile \
-            --fqbn "esp32:esp32:esp32" \
-            --output-dir "${{ github.workspace }}/build" \
-            --warnings none \
-            "${{ github.workspace }}/BambuTagger-AMS-C.ino"
+          mkdir -p build
+          cp .pio/build/esp32-ams-c/firmware.bin build/
+          cp .pio/build/esp32-ams-c/bootloader.bin build/
+          cp .pio/build/esp32-ams-c/partitions.bin build/
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin build/
 
       - name: Create merged binary
         run: |
-          pip install esptool --quiet
-          APP="${{ github.workspace }}/build/BambuTagger-AMS-C.ino.bin"
-          BOOT="${{ github.workspace }}/build/BambuTagger-AMS-C.ino.bootloader.bin"
-          PART="${{ github.workspace }}/build/BambuTagger-AMS-C.ino.partitions.bin"
-          MERGED="${{ github.workspace }}/build/BambuTagger-AMS-C_merged.bin"
-
-          esptool.py \
-            --chip esp32 \
-            merge_bin \
-            --output "$MERGED" \
-            --flash_mode dio \
-            --flash_freq 40m \
+          esptool.py --chip esp32 merge_bin \
+            --output build/firmware_merged.bin \
+            --flash_mode qio \
+            --flash_freq 80m \
             --flash_size 4MB \
-            0x1000   "$BOOT" \
-            0x8000   "$PART" \
-            0xe000   ~/.arduino15/packages/esp32/hardware/esp32/3.0.7/tools/partitions/boot_app0.bin \
-            0x10000  "$APP"
+            0x1000   build/bootloader.bin \
+            0x8000   build/partitions.bin \
+            0xe000   build/boot_app0.bin \
+            0x10000  build/firmware.bin
 
           echo "=== Build artefacts ==="
-          ls -lh "${{ github.workspace }}/build/"
+          ls -lh build/
 
       - name: Upload firmware artefacts
         uses: actions/upload-artifact@v4
@@ -95,10 +75,10 @@ jobs:
           name: BambuTagger-AMS-C-firmware-${{ github.sha }}
           retention-days: 30
           path: |
-            build/BambuTagger-AMS-C.ino.bin
-            build/BambuTagger-AMS-C.ino.bootloader.bin
-            build/BambuTagger-AMS-C.ino.partitions.bin
-            build/BambuTagger-AMS-C_merged.bin
+            build/firmware.bin
+            build/bootloader.bin
+            build/partitions.bin
+            build/firmware_merged.bin
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -107,31 +87,31 @@ jobs:
           name: "BambuTagger-AMS-C ${{ github.ref_name }}"
           generate_release_notes: true
           files: |
-            build/BambuTagger-AMS-C.ino.bin
-            build/BambuTagger-AMS-C.ino.bootloader.bin
-            build/BambuTagger-AMS-C.ino.partitions.bin
-            build/BambuTagger-AMS-C_merged.bin
+            build/firmware.bin
+            build/bootloader.bin
+            build/partitions.bin
+            build/firmware_merged.bin
           body: |
             ## Flashing instructions
 
             ### Easiest — merged binary (single file, address 0x00)
             ```
             esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
-              write_flash 0x0 BambuTagger-AMS-C_merged.bin
+              write_flash 0x0 firmware_merged.bin
             ```
 
             ### Manual — separate files
             ```
             esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 921600 \
               write_flash \
-              0x1000   BambuTagger-AMS-C.ino.bootloader.bin \
-              0x8000   BambuTagger-AMS-C.ino.partitions.bin \
-              0x10000  BambuTagger-AMS-C.ino.bin
+              0x1000   bootloader.bin \
+              0x8000   partitions.bin \
+              0x10000  firmware.bin
             ```
 
             > **Board:** ESP32 Dev Module  
-            > **Core:** esp32:esp32 3.0.7  
-            > **Flash:** 4 MB, DIO, 40 MHz
+            > **Build system:** PlatformIO  
+            > **Flash:** 4 MB, QIO, 80 MHz
 
             ### OTA Update
-            Upload `BambuTagger-AMS-C.ino.bin` via the web interface (Status → Update Firmware).
+            Upload `firmware.bin` via the web interface (Status → Update Firmware).
