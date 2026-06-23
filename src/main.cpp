@@ -50,6 +50,7 @@ String localIP = "";
 const byte DNS_PORT = 53;
 
 void handleReboot();
+void performOTAUpdate();
 void connectWiFi();
 void startCaptivePortal();
 void updateLedStatus();
@@ -382,7 +383,7 @@ void performOTAUpdate() {
     // Construct download URL directly — no asset JSON needed
     dlUrl = String("https://github.com/") + OTA_REPO
             + "/releases/download/" + latest
-            + "/BambuTagger-AMS-C.ino.bin";
+            + "/firmware.bin";
     Serial.printf("[OTA] tag: %s\n", latest.c_str());
     Serial.printf("[OTA] dlUrl: %s\n", dlUrl.c_str());
   }  // ← client, http destroyed here — heap reclaimed
